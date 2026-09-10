@@ -11,6 +11,8 @@
  * See proposal-gear-lineage-plan-2026-04-29.md §5 for the role of each shape.
  */
 
+import type { JsonObject } from '@/shared/lib/jsonb';
+
 export type ProposalGearChild = {
   proposalItemId: string;
   catalogPackageId: string;
@@ -26,7 +28,7 @@ export type ProposalGearBundle = {
   packageInstanceId: string;
   catalogPackageId: string;
   packageName: string;
-  packageSnapshot: Record<string, unknown>;
+  packageSnapshot: JsonObject;
   decomposed: boolean;
   headerQuantity: number;
   /** Used when decomposed=false — the bundle becomes one gear row. */
@@ -61,7 +63,7 @@ export type ProposalGearService = {
   proposalItemId: string;
   catalogPackageId: string;
   serviceName: string;
-  packageSnapshot: Record<string, unknown>;
+  packageSnapshot: JsonObject;
   quantity: number;
   packageInstanceId: string | null;
 };

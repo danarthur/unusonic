@@ -24,7 +24,7 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
   const handleScan = async () => {
     const trimmed = getUrl()?.trim();
     if (!trimmed) {
-      toast.error('Enter a website to scan.');
+      toast.error('Enter a website to scan.', { duration: Infinity });
       return;
     }
 
@@ -36,7 +36,7 @@ export function ScoutTrigger({ getUrl, onEnrich, disabled }: ScoutTriggerProps) 
     const result = await scoutEntity(trimmed);
 
     if ('error' in result) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
     } else {
       toast.success('Intelligence acquired');
       setFindings(result.data);

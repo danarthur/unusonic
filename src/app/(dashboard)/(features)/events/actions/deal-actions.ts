@@ -1,5 +1,6 @@
 'use server';
 
+import { syncDealMainContact } from './sync-deal-main-contact';
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
@@ -314,6 +315,14 @@ export async function createDeal(input: CreateDealInput): Promise<CreateDealResu
     const result = data as { deal_id?: string } | null;
     if (!result?.deal_id) {
       return { success: false, error: 'create_deal_complete returned no deal_id' };
+    }
+
+    // The column five readers use for "who is this deal for" when the client is
+    // a person rather than a company. Not fatal if it fails -- the deal exists
+    // and the name resolves everywhere that reads the stakeholder directly.
+    const synced = await syncDealMainContact(result.deal_id);
+    if (!synced.ok) {
+      console.error('[CRM] createDeal main_contact sync:', synced.error);
     }
 
     revalidatePath('/events');

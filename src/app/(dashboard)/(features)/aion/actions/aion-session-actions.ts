@@ -304,8 +304,8 @@ export async function resumeOrCreateSession(
     const { data, error } = await supabase.schema('cortex').rpc('resume_or_create_aion_session', {
       p_workspace_id: workspaceId,
       p_scope_type: scopeType,
-      p_scope_entity_id: scopeEntityId ?? null,
-      p_title: title ?? null,
+      p_scope_entity_id: scopeEntityId ?? undefined,
+      p_title: title ?? undefined,
     });
     if (error) return { success: false, error: error.message };
     // RPC returns TABLE(session_id uuid, is_new boolean) — supabase-js surfaces
@@ -345,8 +345,8 @@ export async function createNewScopedSession(
     const { data, error } = await supabase.schema('cortex').rpc('create_new_aion_session_for_scope', {
       p_workspace_id: workspaceId,
       p_scope_type: scopeType,
-      p_scope_entity_id: scopeEntityId ?? null,
-      p_title: title ?? null,
+      p_scope_entity_id: scopeEntityId ?? undefined,
+      p_title: title ?? undefined,
     });
     if (error) return { success: false, error: error.message };
     if (!data) return { success: false, error: 'Unexpected empty RPC response' };
@@ -451,7 +451,7 @@ export async function continueSessionInNewChat(
       .rpc('create_new_aion_session_for_scope', {
         p_workspace_id: src.workspace_id,
         p_scope_type: src.scope_type,
-        p_scope_entity_id: src.scope_entity_id,
+        p_scope_entity_id: src.scope_entity_id ?? undefined,
         p_title: newTitle,
       });
 

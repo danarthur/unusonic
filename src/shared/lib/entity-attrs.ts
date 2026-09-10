@@ -64,14 +64,22 @@ const AddressSchema = z
 
 /**
  * OrgOperationalSettings sub-object (attributes.operational_settings).
- * Contains: tax_id, payment_terms, entity_type, doing_business_as, phone.
+ * Contains: tax_id, payment_terms, w9_status, coi_expiry, entity_type,
+ * doing_business_as, phone.
  * `entity_type` stores the Scout-written value (not in a top-level COMPANY_ATTR key —
  * see attribute-keys.ts for the NOTE on Scout-written fields).
+ *
+ * A Zod object strips what it does not name, so anything written into this bag
+ * and not listed here is silently discarded on the next save. Company
+ * compliance lives here rather than at the top of attributes because this is
+ * the bag `orgOperationalSettings` exposes to the record page.
  */
 const OperationalSettingsSchema = z
   .object({
     tax_id: z.string().nullable().optional(),
     payment_terms: z.string().nullable().optional(),
+    w9_status: z.boolean().nullable().optional(),
+    coi_expiry: z.string().nullable().optional(),
     entity_type: z.string().nullable().optional(),
     doing_business_as: z.string().nullable().optional(),
     phone: z.string().nullable().optional(),
@@ -177,6 +185,9 @@ export const PersonAttrsSchema = z.object({
   [PERSON_ATTR.phone]: optStr,
   [PERSON_ATTR.market]: optStr,
   [PERSON_ATTR.union_status]: optStr,
+  [PERSON_ATTR.rate_amount]: z.number().nullable().optional(),
+  [PERSON_ATTR.rate_unit]: optStr,
+  [PERSON_ATTR.rate_note]: optStr,
   [PERSON_ATTR.cdl]: boolFlag,
   [PERSON_ATTR.w9_status]: boolFlag,
   [PERSON_ATTR.coi_expiry]: optStr,
@@ -256,6 +267,7 @@ export const VenueAttrsSchema = z.object({
   [VENUE_ATTR.curfew]: optStr,
   [VENUE_ATTR.house_power_amps]: z.union([z.string(), z.number()]).nullable().optional(),
   [VENUE_ATTR.union_local]: optStr,
+  [VENUE_ATTR.specs_confirmed]: z.record(z.string(), z.string()).nullable().optional(),
   [VENUE_ATTR.house_pa_included]: z.boolean().nullable().optional(),
   [VENUE_ATTR.house_lighting_included]: z.boolean().nullable().optional(),
   [VENUE_ATTR.wifi_credentials]: optStr,
@@ -458,14 +470,26 @@ export function toIONContext(
     emitValue(k, v);
   }
 
-  // Step 2: emit remaining unknown keys from the raw JSONB (Scout-written, future keys, etc.)
-  const emitted = new Set(Object.keys(result));
-  if (raw != null && typeof raw === 'object') {
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      if (emitted.has(k)) continue;
-      emitValue(k, v);
-    }
-  }
+  /*
+    There is no step 2.
+
+    This used to walk the raw JSONB and emit every key the typed accessor did
+    not already know about -- Scout-written keys, future keys, anything. That
+    made the whole thing a DENYLIST: six SENTINEL_KEYS were stripped and
+    everything else went to the model, including internal flags nobody had
+    thought about yet.
+
+    That polarity is what put "Brandi Jane is a ghost" in front of an owner. The
+    generated brief was deleted over it, but the brief was the symptom; this
+    function is the channel, and it feeds Aion chat, which is a larger surface
+    than the brief ever had.
+
+    `readEntityAttrs` above IS the allowlist: a key reaches the model when
+    somebody has declared it in the typed schema, which is also the moment they
+    decide it is fit to say out loud. A new attribute stops being visible to
+    Aion until it is declared -- that is the intended cost, and it is cheaper
+    than the alternative.
+  */
 
   return result;
 }

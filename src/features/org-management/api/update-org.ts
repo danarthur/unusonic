@@ -6,6 +6,8 @@ import { updateOrgSchema } from '@/entities/organization/model/schema';
 import type { UpdateOrgInput } from '@/entities/organization/model/schema';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { revalidatePath } from 'next/cache';
+import type { TablesUpdate } from '@/types/supabase';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 export type UpdateOrgResult = { ok: true } | { ok: false; error: string };
 
@@ -34,7 +36,7 @@ export async function updateOrg(input: UpdateOrgInput): Promise<UpdateOrgResult>
   if (!entity) return { ok: false, error: 'Organization not found.' };
 
   // Top-level column updates
-  const colUpdate: Record<string, unknown> = {};
+  const colUpdate: TablesUpdate<{ schema: 'directory' }, 'entities'> = {};
   if (payload.name !== undefined) colUpdate.display_name = payload.name;
   if (payload.logo_url !== undefined) colUpdate.avatar_url = payload.logo_url ?? null;
 
@@ -48,7 +50,7 @@ export async function updateOrg(input: UpdateOrgInput): Promise<UpdateOrgResult>
   }
 
   // JSONB attribute patch via safe merge RPC
-  const attrPatch: Record<string, unknown> = {};
+  const attrPatch: JsonObject = {};
   if (payload.description !== undefined) attrPatch.description = payload.description ?? null;
   if (payload.brand_color !== undefined) attrPatch.brand_color = payload.brand_color ?? null;
   if (payload.website !== undefined) attrPatch.website = payload.website === '' ? null : payload.website;

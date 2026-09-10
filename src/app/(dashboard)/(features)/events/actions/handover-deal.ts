@@ -17,6 +17,7 @@ import { resolveStageByKind } from '@/shared/lib/pipeline-stages/resolve-stage';
 import { SeriesRuleSchema, expandSeriesRule, type SeriesRule } from '@/shared/lib/series-rule';
 import { seedHandoffNarrative } from './seed-handoff-narrative';
 import { migrateCallerDealSessionToEvent } from './migrate-deal-session-to-event';
+import type { Json } from '@/types/supabase';
 
 export type HandoverResult =
   | { success: true; eventId: string; warnings?: string[] }
@@ -318,7 +319,8 @@ export async function handoverDeal(
     client_entity_id: clientEntityId,
     location_name: locationName,
     event_archetype: archetypeForEvents,
-    run_of_show_data: runOfShowData,
+    // JSONB column: the handover payload is JSON-shaped by construction.
+    run_of_show_data: runOfShowData as unknown as Json,
   }));
 
   const { data: insertedEvents, error: eventErr } = await supabase
@@ -648,7 +650,7 @@ async function seedDjClientInfo(
 
   // Merge into existing run_of_show_data without clobbering other keys.
   // Surfaces RPC failures so DJ prep never silently lands blank.
-  const { error: rpcError } = await supabase.rpc('patch_event_ros_data', {
+  const { error: rpcError } = await supabase.schema('ops').rpc('patch_event_ros_data', {
     p_event_id: eventId,
     p_patch: {
       dj_client_details: details,

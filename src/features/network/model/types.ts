@@ -32,7 +32,6 @@ export interface NetworkOrganization {
   category: NetworkBadgeKind | null;
   /** Our private notes/rating about this org (only when owner_org_id = current_org). */
   private_notes: string | null;
-  internal_rating: number | null;
   /** Entities (people) linked to this org. */
   roster: NetworkEntity[];
 }

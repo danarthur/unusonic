@@ -199,15 +199,15 @@ function PrismSkeleton() {
       >
         <div
           className="h-32 w-full stage-skeleton"
-          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+          style={{ borderRadius: 'var(--stage-radius-panel)' }}
         />
         <div
           className="h-24 w-full stage-skeleton"
-          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+          style={{ borderRadius: 'var(--stage-radius-panel)' }}
         />
         <div
           className="h-48 w-full stage-skeleton"
-          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+          style={{ borderRadius: 'var(--stage-radius-panel)' }}
         />
       </div>
     </>

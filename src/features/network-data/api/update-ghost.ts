@@ -13,6 +13,7 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { CompanyAttrsSchema } from '@/shared/lib/entity-attrs';
 import { COMPANY_ATTR } from '@/features/network-data/model/attribute-keys';
 import { ZodError } from 'zod';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 function nameValid(v: string): boolean {
   return typeof v === 'string' && v.trim().length > 1;
@@ -50,6 +51,14 @@ export type UpdateGhostProfilePayload = {
   defaultCurrency?: string | null;
   taxId?: string | null;
   paymentTerms?: string | null;
+  /**
+   * Company compliance. Lives in operational_settings beside tax_id and
+   * payment_terms rather than at the top of attributes: that bag is what
+   * `orgOperationalSettings` exposes and what the record page reads, and a
+   * second home for the same fact is how the two drift.
+   */
+  w9Status?: boolean | null;
+  coiExpiry?: string | null;
   category?: string | null;
 };
 
@@ -100,6 +109,15 @@ export async function updateGhostProfile(
   const paymentTerms = isFormData
     ? strOrNull((formData as FormData).get('paymentTerms'))
     : (formData as UpdateGhostProfilePayload).paymentTerms ?? null;
+  const w9Status = isFormData
+    ? (() => {
+        const raw = (formData as FormData).get('w9Status');
+        return raw === null ? null : raw === 'true';
+      })()
+    : (formData as UpdateGhostProfilePayload).w9Status ?? null;
+  const coiExpiry = isFormData
+    ? strOrNull((formData as FormData).get('coiExpiry'))
+    : (formData as UpdateGhostProfilePayload).coiExpiry ?? null;
   const category = isFormData
     ? strOrNull((formData as FormData).get('category'))
     : (formData as UpdateGhostProfilePayload).category ?? null;
@@ -141,17 +159,21 @@ export async function updateGhostProfile(
 
   // Merge operational settings safely
   const existingAttrs = (ghost.attributes as Record<string, unknown>) ?? {};
-  const existingOps = (existingAttrs[COMPANY_ATTR.operational_settings] as Record<string, unknown>) ?? {};
-  const ops: Record<string, unknown> = {
+  const existingOps = (existingAttrs[COMPANY_ATTR.operational_settings] as JsonObject) ?? {};
+  const ops: JsonObject = {
     ...existingOps,
     doing_business_as: doingBusinessAs ?? existingOps.doing_business_as ?? null,
     entity_type: entityType ?? existingOps.entity_type ?? null,
     tax_id: taxId ?? existingOps.tax_id ?? null,
     payment_terms: paymentTerms ?? existingOps.payment_terms ?? null,
+    // A false W-9 is a real answer, so `??` on a boolean would pin it to true
+    // once set. Only an absent field falls through to the existing value.
+    w9_status: w9Status === null ? existingOps.w9_status ?? null : w9Status,
+    coi_expiry: coiExpiry ?? existingOps.coi_expiry ?? null,
     phone: phoneVal ?? existingOps.phone ?? null,
   };
 
-  const attrPatch: Record<string, unknown> = {
+  const attrPatch: JsonObject = {
     [COMPANY_ATTR.website]: website?.trim() || null,
     [COMPANY_ATTR.brand_color]: brandColor?.trim() || null,
     [COMPANY_ATTR.support_email]: supportEmail?.trim() || null,

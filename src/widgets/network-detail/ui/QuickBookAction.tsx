@@ -135,7 +135,7 @@ export function QuickBookAction({ entityId, entityName }: QuickBookActionProps) 
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={STAGE_MEDIUM}
-            className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+            className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-3"
             data-surface="elevated"
           >
             <h3 className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">

@@ -102,7 +102,7 @@ export async function addCatalogItemAssignee(
     const { data, error } = await supabase.rpc('add_catalog_item_assignee', {
       p_package_id: packageId,
       p_entity_id: entityId,
-      p_role_note: roleNote ?? null,
+      p_role_note: roleNote ?? undefined,
     });
 
     if (error) return { success: false, error: error.message };

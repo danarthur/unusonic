@@ -403,15 +403,15 @@ export function PlanLens({
       <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide, 12px)' }} aria-hidden>
         <div
           className="h-32 w-full stage-skeleton"
-          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+          style={{ borderRadius: 'var(--stage-radius-panel)' }}
         />
         <div
           className="h-24 w-full stage-skeleton"
-          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+          style={{ borderRadius: 'var(--stage-radius-panel)' }}
         />
         <div
           className="h-48 w-full stage-skeleton"
-          style={{ borderRadius: 'var(--stage-radius-card, 12px)' }}
+          style={{ borderRadius: 'var(--stage-radius-panel)' }}
         />
       </div>
     );

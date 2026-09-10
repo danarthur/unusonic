@@ -3,8 +3,20 @@
 import { useCallback, useRef, useState, useTransition, useOptimistic } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronDown, Star } from 'lucide-react';
-import { NetworkCard } from '@/entities/network';
+import { NetworkRow } from '@/entities/network';
+import { rowFactsFor } from '@/entities/network/model/row-facts';
+import { filterNodes } from '@/entities/network/model/search-node';
+import { sortNodes, DEFAULT_SORT, type SortMode } from '@/entities/network/model/sort-nodes';
+import { SortControl } from './SortControl';
+import { CategoryTabs, type CategoryFilter } from './CategoryTabs';
+import { ContactSearch } from './ContactSearch';
+import { RosterSection } from './RosterSection';
+import { usePublishVisibleOrder } from '../model/visible-order';
+import { FileContactControl } from './FileContactControl';
+
+/** Referentially stable, so filtering a section out does not churn its props. */
+const EMPTY_NODES: NetworkNode[] = [];
+import { StarredStrip } from './StarredStrip';
 import { GenesisState } from './GenesisState';
 import { cn } from '@/shared/lib/utils';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
@@ -12,6 +24,7 @@ import type { NetworkNode } from '@/entities/network';
 import { isInCategory, isUnsorted } from '@/entities/network/model/categories';
 import { categoryLabels, DEFAULT_LABEL_PACK, type LabelPack } from '@/entities/network/model/label-packs';
 import { CategorySection } from './CategorySection';
+import { EditableRate } from '@/features/network-data/ui/EditableRate';
 
 // =============================================================================
 // Helpers: classify nodes into zones using existing kind/gravity/entityType
@@ -42,24 +55,6 @@ function isOtherNode(n: NetworkNode): boolean {
 // Crew zone: role grouping
 // =============================================================================
 
-function groupByRole(nodes: NetworkNode[]): Map<string, NetworkNode[]> {
-  const groups = new Map<string, NetworkNode[]>();
-  for (const node of nodes) {
-    const key = node.roleGroup || 'Other';
-    const arr = groups.get(key) ?? [];
-    arr.push(node);
-    groups.set(key, arr);
-  }
-  // Sort groups alphabetically, but "Other" always last
-  const sorted = new Map<string, NetworkNode[]>();
-  const keys = [...groups.keys()].sort((a, b) => {
-    if (a === 'Other') return 1;
-    if (b === 'Other') return -1;
-    return a.localeCompare(b);
-  });
-  for (const key of keys) sorted.set(key, groups.get(key)!);
-  return sorted;
-}
 
 // =============================================================================
 // Category membership
@@ -120,6 +115,14 @@ export function StreamLayout({
 }: StreamLayoutProps) {
   const router = useRouter();
 
+  // Affiliated people often have no direct edge to the workspace, so they are
+  // not nodes in this stream and cannot be opened as one. Route to the entity
+  // page instead -- the same destination TeamCard uses from a company sheet.
+  const openAffiliate = useCallback(
+    (entityId: string) => router.push(`/network/entity/${entityId}`),
+    [router],
+  );
+
   // Hover prefetch with intent delay — fires onNodeHover only after the
   // pointer has rested on a card for 150ms. Cancels if the pointer leaves
   // before the timer fires, so accidental fly-overs don't trigger fetches.
@@ -139,11 +142,9 @@ export function StreamLayout({
     }
   }, []);
   const [, startTransition] = useTransition();
-  const [crewSearch, setCrewSearch] = useState('');
-  const [innerCircleSearch, setInnerCircleSearch] = useState('');
-  const [crewExpanded, setCrewExpanded] = useState(true);
-  const [innerCircleExpanded, setInnerCircleExpanded] = useState(true);
-  const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT);
+  const [category, setCategory] = useState<CategoryFilter>('all');
+  const [query, setQuery] = useState('');
 
   const [optimisticNodes, dispatchOptimistic] = useOptimistic(
     nodes,
@@ -193,289 +194,119 @@ export function StreamLayout({
     });
   };
 
-  // Shared search filter
-  function searchFilter(nodes: NetworkNode[], query: string): NetworkNode[] {
-    if (!query.trim()) return nodes;
-    const q = query.toLowerCase();
-    return nodes.filter(
-      (n) =>
-        n.identity.name.toLowerCase().includes(q) ||
-        (n.identity.label ?? '').toLowerCase().includes(q) ||
-        (n.meta.tags ?? []).some((t) => t.toLowerCase().includes(q))
-    );
-  }
-
-  // Crew zone: search, role grouping and filtering
-  const searchedCrewNodes = searchFilter(crewNodes, crewSearch);
-  const roleGroups = groupByRole(searchedCrewNodes);
-  const allRoleKeys = [...groupByRole(crewNodes).keys()]; // Use unfiltered for pill labels
-  const filteredCrewNodes = activeRoleFilter
-    ? searchedCrewNodes.filter((n) => (n.roleGroup || 'Other') === activeRoleFilter)
-    : searchedCrewNodes;
-  const filteredRoleGroups = activeRoleFilter
-    ? new Map([[activeRoleFilter, filteredCrewNodes]])
-    : roleGroups;
-
   // Inner Circle zone: search
-  const displayedInnerCircle = searchFilter(innerCircleNodes, innerCircleSearch);
+  const displayedInnerCircle = sortNodes(filterNodes(innerCircleNodes, query), sortMode);
+
+  // Every grid reserves its own rows; without it a section of bare names
+  // renders three blank lines under each card.
+  const sortedStarred = sortNodes(starredNodes, sortMode);
+  const clientFacts = rowFactsFor(displayedInnerCircle);
+
+
+  // Only categories with something in them, in page order.
+  const categoryOptions = ([
+    { id: 'roster', label: labels.roster, count: crewNodes.length },
+    { id: 'clients', label: labels.clients, count: innerCircleNodes.length },
+    { id: 'vendors', label: labels.vendors, count: vendorNodes.length },
+    { id: 'venues', label: labels.venues, count: venueNodes.length },
+    { id: 'unsorted', label: 'Unsorted', count: unsortedNodes.length },
+  ] as const).filter((o) => o.count > 0).map((o) => ({ ...o }));
+
+  /** A section renders when nothing is filtered, or when it is the one asked for. */
+  const shows = (id: CategoryFilter) => category === 'all' || category === id;
+  // Publish the order on screen so the panel can step through it. Section order
+  // top to bottom, because that is the sequence being read.
+  usePublishVisibleOrder(
+    [
+      ...(shows('roster') ? filterNodes(crewNodes, query) : []),
+      ...(shows('clients') ? displayedInnerCircle : []),
+      ...(shows('vendors') ? filterNodes(vendorNodes, query) : []),
+      ...(shows('venues') ? filterNodes(venueNodes, query) : []),
+      ...(shows('unsorted') ? filterNodes(unsortedNodes, query) : []),
+    ].map((n) => ({ id: n.id, kind: n.kind })),
+  );
 
   return (
     <div className={cn('relative flex w-full flex-col gap-8', showGenesis && 'flex-1 min-h-0')}>
 
-      {/* ── Starred — this user's own shortcuts, above everything ── */}
-      {starredNodes.length > 0 && (
-        <div className="flex flex-col gap-5">
-          <div className="flex items-center gap-2">
-            <Star size={12} strokeWidth={1.5} className="text-[var(--stage-text-secondary)]" />
-            <h2 className="stage-label text-[var(--stage-text-secondary)]">Starred</h2>
-            <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-              {starredNodes.length}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {starredNodes.map((node) => (
-              <div
-                key={`starred-${node.id}`}
-                className="h-full"
-                onMouseEnter={() => handleNodeHoverEnter(node)}
-                onMouseLeave={handleNodeHoverLeave}
-              >
-                {/* No layoutId here on purpose: this node also renders in its
-                    category below, and two elements sharing a layoutId make
-                    Framer Motion animate between them. */}
-                <NetworkCard
-                  node={node}
-                  onClick={() => onNodeClick?.(node)}
-                  onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
-                />
-              </div>
-            ))}
+      {/*
+        Navigation first, then the controls that act on what it chose. Every
+        system surveyed orders it this way -- Polaris, SAP, Salesforce, Carbon
+        all put the scope switcher above the search, nearest the page title,
+        because it decides what the rest of the page even is.
+      */}
+      {!showGenesis && (
+        <div className="flex flex-col gap-4">
+          <CategoryTabs value={category} onChange={setCategory} options={categoryOptions} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ContactSearch
+              value={query}
+              onChange={setQuery}
+              scopeLabel={categoryOptions.find((o) => o.id === category)?.label ?? null}
+            />
+            <SortControl value={sortMode} onChange={setSortMode} />
           </div>
         </div>
       )}
-
-      {/* ── Roster — staff, contractors and freelancers (ROSTER_MEMBER / PARTNER) ── */}
-      {crewNodes.length > 0 && (
-        <section>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setCrewExpanded((v) => !v)}
-              className="flex items-center gap-2 text-left group"
-            >
-              <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                {labels.roster}
-              </h2>
-              <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-                {crewNodes.length}
-              </span>
-              <ChevronDown
-                className={cn(
-                  'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-                  crewExpanded && 'rotate-180'
-                )}
-              />
-            </button>
-            {crewExpanded && (
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Search crew…"
-                  aria-label="Search crew"
-                  value={crewSearch}
-                  onChange={(e) => setCrewSearch(e.target.value)}
-                  className={cn(
-                    'stage-input h-8 !pl-7 pr-3 text-xs',
-                    'focus-visible:outline-none',
-                    crewSearch ? 'w-40' : 'w-28 focus:w-40'
-                  )}
-                />
-              </div>
-            )}
-          </div>
-
-          <AnimatePresence>
-            {crewExpanded && (
-              <motion.div
-                key="crew-content"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={STAGE_MEDIUM}
-                className="overflow-hidden"
-              >
-                {/* Role filter pills */}
-                {allRoleKeys.length > 1 && (
-                  <div className="mb-4 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRoleFilter(null)}
-                      className={cn(
-                        'rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                        !activeRoleFilter
-                          ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                          : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                      )}
-                    >
-                      All
-                    </button>
-                    {allRoleKeys.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setActiveRoleFilter(activeRoleFilter === key ? null : key)}
-                        className={cn(
-                          'flex items-center gap-1.5 rounded-xl px-3 py-1.5 stage-badge-text transition-colors duration-100',
-                          activeRoleFilter === key
-                            ? 'bg-[var(--stage-accent)]/15 text-[var(--stage-accent)] shadow-[inset_0_0_0_1px_var(--stage-accent)/30]'
-                            : 'bg-[oklch(1_0_0/0.05)] text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]'
-                        )}
-                      >
-                        {key}
-                        <span
-                          className={cn(
-                            'rounded-full px-1.5 py-px stage-badge-text tabular-nums',
-                            activeRoleFilter === key
-                              ? 'bg-[var(--stage-accent)]/20 text-[var(--stage-accent)]'
-                              : 'bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)]'
-                          )}
-                        >
-                          {roleGroups.get(key)?.length ?? 0}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Role-grouped cards */}
-                {filteredCrewNodes.length > 0 ? (
-                  <div className="flex flex-col gap-6">
-                    {[...filteredRoleGroups.entries()].map(([role, groupNodes]) => (
-                      <div key={role}>
-                        {/* Only show role header if there are multiple groups and no active filter */}
-                        {allRoleKeys.length > 1 && !activeRoleFilter && (
-                          <p className="mb-2 stage-label text-[var(--stage-text-secondary)]/60">
-                            {role}
-                          </p>
-                        )}
-                        <div className="grid grid-cols-2 gap-[var(--stage-gap)] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                          {groupNodes.map((node) => (
-                            <div
-                              key={node.id}
-                              className="h-full"
-                              onMouseEnter={() => handleNodeHoverEnter(node)}
-                              onMouseLeave={handleNodeHoverLeave}
-                            >
-                              <NetworkCard
-                                node={node}
-                                layoutId={`node-${node.id}`}
-                                onClick={() => onNodeClick?.(node)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <p className="stage-label text-[var(--stage-text-secondary)]">
-                      No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{crewSearch}&rdquo;</span>
-                    </p>
-                    <button type="button" onClick={() => { setCrewSearch(''); setActiveRoleFilter(null); }} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
-                      Clear filter
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
+      <StarredStrip
+        nodes={sortedStarred}
+        onNodeClick={onNodeClick}
+        onAffiliateClick={openAffiliate}
+        onNodeHoverEnter={handleNodeHoverEnter}
+        onNodeHoverLeave={handleNodeHoverLeave}
+        onToggleStar={onToggleStar ? handleToggleStar : undefined}
+      />
+      {shows('roster') && (
+        <RosterSection
+          nodes={crewNodes}
+          roleLabels={roleLabels}
+          query={query}
+          label={labels.roster}
+          sortMode={sortMode}
+          onNodeClick={onNodeClick}
+          onAffiliateClick={openAffiliate}
+          onNodeHoverEnter={handleNodeHoverEnter}
+          onNodeHoverLeave={handleNodeHoverLeave}
+        />
       )}
 
       {/* ── Clients — anyone on a CLIENT edge, person or company ── */}
-      {innerCircleNodes.length > 0 && (
+      {displayedInnerCircle.length > 0 && shows('clients') && (
         <>
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setInnerCircleExpanded((v) => !v)}
-                className="flex items-center gap-2 text-left group"
-              >
-                <h2 className="stage-label text-[var(--stage-text-secondary)]">
-                  {labels.clients}
-                </h2>
-                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums text-[var(--stage-text-secondary)]">
-                  {innerCircleNodes.length}
+              <h2 className="flex items-center gap-2 stage-label text-[var(--stage-text-secondary)]">
+                {labels.clients}
+                <span className="shrink-0 rounded-full bg-[oklch(1_0_0/0.06)] px-2.5 py-0.5 stage-badge-text tabular-nums">
+                  {displayedInnerCircle.length === innerCircleNodes.length
+                    ? innerCircleNodes.length
+                    : `${displayedInnerCircle.length} of ${innerCircleNodes.length}`}
                 </span>
-                <ChevronDown
-                  className={cn(
-                    'size-3.5 text-[var(--stage-text-secondary)] transition-transform duration-[120ms]',
-                    innerCircleExpanded && 'rotate-180'
-                  )}
-                />
-              </button>
-              {innerCircleExpanded && innerCircleNodes.length > 3 && (
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-[var(--stage-text-secondary)]/60 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search partners…"
-                    aria-label="Search inner circle"
-                    value={innerCircleSearch}
-                    onChange={(e) => setInnerCircleSearch(e.target.value)}
-                    className={cn(
-                      'stage-input h-8 !pl-7 pr-3 text-xs',
-                      'focus-visible:outline-none',
-                      innerCircleSearch ? 'w-40' : 'w-28 focus:w-40'
-                    )}
+              </h2>
+            </div>
+            <div className="flex flex-col divide-y divide-[var(--stage-edge-subtle)] pb-2">
+              {displayedInnerCircle.map((node) => (
+                <div
+                  key={node.id}
+                  onMouseEnter={() => handleNodeHoverEnter(node)}
+                  onMouseLeave={handleNodeHoverLeave}
+                >
+                  <NetworkRow
+                    node={node}
+                    facts={clientFacts}
+                    onClick={() => onNodeClick?.(node)}
+                    onAffiliateClick={openAffiliate}
+                    rateEditor={
+                      <EditableRate
+                        entityId={node.entityId}
+                        rate={node.meta.rate ?? null}
+                        onSaved={() => router.refresh()}
+                      />
+                    }
                   />
                 </div>
-              )}
+              ))}
             </div>
-            <AnimatePresence>
-              {innerCircleExpanded && (
-                <motion.div
-                  key="inner-circle-content"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={STAGE_MEDIUM}
-                  className="overflow-hidden"
-                >
-                  {displayedInnerCircle.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-[var(--stage-gap)] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                      {displayedInnerCircle.map((node) => (
-                        <div
-                          key={node.id}
-                          className="h-full"
-                          onMouseEnter={() => handleNodeHoverEnter(node)}
-                          onMouseLeave={handleNodeHoverLeave}
-                        >
-                          <NetworkCard
-                            node={node}
-                            layoutId={`node-${node.id}`}
-                            onClick={() => onNodeClick?.(node)}
-                            onTogglePreferred={onToggleStar ? () => handleToggleStar(node) : undefined}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <p className="stage-label text-[var(--stage-text-secondary)]">
-                        No results for <span className="text-[var(--stage-text-primary)]">&ldquo;{innerCircleSearch}&rdquo;</span>
-                      </p>
-                      <button type="button" onClick={() => setInnerCircleSearch('')} className="mt-2 stage-badge-text text-[var(--stage-accent)] hover:underline">
-                        Clear filter
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </section>
         </>
       )}
@@ -505,32 +336,55 @@ export function StreamLayout({
             className="flex flex-col gap-8"
           >
             <CategorySection
+              layout="rows"
               title={labels.vendors}
-              nodes={vendorNodes}
+              nodes={shows('vendors') ? vendorNodes : EMPTY_NODES}
               roleLabels={roleLabels}
               onNodeClick={onNodeClick}
+              onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+              sortMode={sortMode}
+              query={query}
+              onClearQuery={() => setQuery('')}
+              onRowChanged={() => router.refresh()}
             />
             <CategorySection
               title={labels.venues}
-              nodes={venueNodes}
+              nodes={shows('venues') ? venueNodes : EMPTY_NODES}
               roleLabels={roleLabels}
               onNodeClick={onNodeClick}
+              onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+              sortMode={sortMode}
+              query={query}
+              onClearQuery={() => setQuery('')}
+              onRowChanged={() => router.refresh()}
+              /* Rooms, not faces. A venue's deciding fact is where it is, an
+                 avatar tile says nothing about it, and there are more of them
+                 than of anyone else -- so this is the clearest case in the
+                 directory for a row over a card. */
+              layout="rows"
             />
             <CategorySection
+              layout="rows"
               title="Unsorted"
-              nodes={unsortedNodes}
-              defaultExpanded={false}
+              nodes={shows('unsorted') ? unsortedNodes : EMPTY_NODES}
               emptyLabel="Nothing waiting to be filed."
+              // A lane needs a way out, or it only grows.
+              renderRowAction={(node) => <FileContactControl node={node} />}
               onNodeClick={onNodeClick}
+              onAffiliateClick={openAffiliate}
               onNodeHoverEnter={handleNodeHoverEnter}
               onNodeHoverLeave={handleNodeHoverLeave}
               onTogglePreferred={onToggleStar ? handleToggleStar : undefined}
+              sortMode={sortMode}
+              query={query}
+              onClearQuery={() => setQuery('')}
+              onRowChanged={() => router.refresh()}
             />
           </motion.div>
         )}

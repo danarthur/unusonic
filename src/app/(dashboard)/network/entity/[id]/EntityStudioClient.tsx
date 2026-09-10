@@ -3,50 +3,36 @@
 import * as React from 'react';
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft,
-  Save,
-  Globe,
   Building2,
-  Radar,
+  AtSign,
   Tag,
   DollarSign,
   Users,
-  FileText,
-  ChevronDown,
-  RotateCcw,
-  Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import { Textarea } from '@/shared/ui/textarea';
 import {
   updateGhostProfile,
-  updateRelationshipNotes,
   updateRelationshipMeta,
-  addContactToGhostOrg,
   addScoutRosterToGhostOrg,
-  softDeleteGhostRelationship,
 } from '@/features/network-data';
-import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { IndividualAttrs, CoupleAttrs, PersonAttrs, VenueAttrs } from '@/shared/lib/entity-attrs';
-import { EmployeeEntityForm } from './EmployeeEntityForm';
-import { FreelancerEntityForm } from './FreelancerEntityForm';
+import { PersonRecordForm } from './PersonRecordForm';
 import { PersonEntityForm } from './PersonEntityForm';
-import { CoupleEntityForm } from './CoupleEntityForm';
-import { AccordionSection, AssignmentsPanel, DealsPanel, FinancePanel } from './entity-studio-panels';
+import { AccordionSection } from './entity-studio-panels';
+import { EntityRecordShell } from './EntityRecordShell';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
+import { useConnectionDelete } from './use-connection-delete';
+import { RosterSection } from './GhostOrgRoster';
 import { VenueSpecsEditor } from './VenueSpecsEditor';
-import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
 import { ColorTuner } from '@/features/org-identity';
 import { AionScoutInput } from '@/widgets/network-detail/ui/AionScoutInput';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
-import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
+import type { NodeDetail } from '@/features/network-data';
 import type { ScoutResult } from '@/features/intelligence';
 import { toast } from 'sonner';
-import { cn } from '@/shared/lib/utils';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 
 const LABEL = 'stage-label';
 
@@ -64,18 +50,20 @@ interface EntityStudioClientProps {
   initialVenueAttrs?: VenueAttrs | null;
   /** Resolved workspace ID for document operations. */
   workspaceId?: string | null;
+  /** Names this person is linked to. Read on the server; see page.tsx. */
+  linkedNames?: string[];
 }
 
 /**
  * Route dispatcher — renders one of three form components based on entity type.
  * Hooks must not be called here; each sub-component manages its own hook lifecycle.
  */
-export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs, initialVenueAttrs, workspaceId }: EntityStudioClientProps) {
+export function EntityStudioClient({ details, sourceOrgId, returnPath = '/network', initialPersonAttrs, initialCoupleAttrs, initialEmployeeAttrs, initialVenueAttrs, workspaceId, linkedNames }: EntityStudioClientProps) {
   const dirType = details.entityDirectoryType;
 
   if (details.kind === 'internal_employee' || details.kind === 'extended_team') {
     return (
-      <EmployeeEntityForm
+      <PersonRecordForm
         details={details}
         sourceOrgId={sourceOrgId}
         initialAttrs={initialEmployeeAttrs ?? null}
@@ -85,42 +73,66 @@ export function EntityStudioClient({ details, sourceOrgId, returnPath = '/networ
     );
   }
 
-  // External-partner persons split by relationship direction. Freelancers /
-  // vendors get the FreelancerEntityForm (skills, business functions, day
-  // rates). Clients are people we work FOR, not people we hire — they need
-  // the plain PersonEntityForm without crew fields.
-  if (details.kind === 'external_partner' && dirType === 'person') {
-    const isClient = details.direction === 'client'
-      || details.relationshipTypeRaw === 'client'
-      || details.relationshipTypeRaw === 'client_company';
-    if (!isClient) {
-      return (
-        <FreelancerEntityForm
-          details={details}
-          sourceOrgId={sourceOrgId}
-          initialAttrs={initialEmployeeAttrs ?? null}
-          returnPath={returnPath ?? '/network'}
-          workspaceId={workspaceId ?? undefined}
-        />
-      );
-    }
+  // People we BOOK share the roster body: same fields, same skills, same
+  // compliance -- the edge decides only whether employment applies. It stays
+  // scoped to PARTNER, the freelancer edge (summonPersonGhost), because a
+  // VENDOR is an outside party and a coordinator on a vendor edge should not
+  // be offered a skill list as though she were crew.
+  if (
+    details.kind === 'external_partner' &&
+    dirType === 'person' &&
+    details.relationshipTypeRaw === 'partner'
+  ) {
+    return (
+      <PersonRecordForm
+        details={details}
+        sourceOrgId={sourceOrgId}
+        initialAttrs={initialEmployeeAttrs ?? null}
+        returnPath={returnPath ?? '/network'}
+        workspaceId={workspaceId ?? undefined}
+      />
+    );
   }
 
   if (dirType === 'person' && initialPersonAttrs !== undefined) {
     return (
       <PersonEntityForm
         details={details}
+        sourceOrgId={sourceOrgId}
+        linkedNames={linkedNames}
         initialAttrs={initialPersonAttrs ?? { first_name: '', last_name: '', email: undefined, phone: undefined, category: undefined }}
         returnPath={returnPath}
         workspaceId={workspaceId ?? undefined}
       />
     );
   }
-  if (dirType === 'couple' && initialCoupleAttrs !== undefined) {
+  /*
+    A legacy `type='couple'` row, shown as the person it mostly is.
+
+    Nothing creates these any more -- production holds none, and the three
+    reclassify doors that could mint one are closed. But the type column has no
+    constraint, so a row could still arrive by restore or direct write, and
+    falling through to the company form would render it as something it is not.
+
+    Partner A's fields become the person's. Partner B's strings stay untouched in
+    the JSONB: nothing here writes them, and the way to bring that person back is
+    to add them as their own record and link the two, which is what every couple
+    created since the show flow already looks like.
+  */
+  if (dirType === 'couple') {
+    const a = initialCoupleAttrs;
     return (
-      <CoupleEntityForm
+      <PersonEntityForm
         details={details}
-        initialAttrs={initialCoupleAttrs ?? { partner_a_first_name: '', partner_a_last_name: '', partner_a_email: undefined, partner_b_first_name: '', partner_b_last_name: '', partner_b_email: undefined, category: undefined }}
+        sourceOrgId={sourceOrgId}
+        linkedNames={linkedNames}
+        initialAttrs={{
+          first_name: a?.partner_a_first_name ?? '',
+          last_name: a?.partner_a_last_name ?? '',
+          email: a?.partner_a_email,
+          phone: undefined,
+          category: a?.category,
+        }}
         returnPath={returnPath}
         workspaceId={workspaceId ?? undefined}
       />
@@ -159,12 +171,12 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
   const [lifecycle, setLifecycle] = React.useState(details.lifecycleStatus ?? 'active');
   const [blacklistReason, setBlacklistReason] = React.useState(details.blacklistReason ?? '');
   const [localTags, setLocalTags] = React.useState<string[]>(tags);
-  const [notes, setNotes] = React.useState(details.notes ?? '');
+  const [w9Status, setW9Status] = React.useState(Boolean(ops.w9_status ?? false));
+  const [coiExpiry, setCoiExpiry] = React.useState((ops.coi_expiry as string) ?? '');
   const [taxId, setTaxId] = React.useState((ops.tax_id as string) ?? '');
   const [paymentTerms, setPaymentTerms] = React.useState((ops.payment_terms as string) ?? '');
   const [defaultCurrency, setDefaultCurrency] = React.useState(details.orgDefaultCurrency ?? 'USD');
   const [resetConfirmOpen, setResetConfirmOpen] = React.useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
 
   const markChanged = React.useCallback(() => setHasChanges(true), []);
 
@@ -179,7 +191,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
     setPhone('');
     setAddress({ street: '', city: '', state: '', postal_code: '', country: '' });
     setLocalTags([]);
-    setNotes('');
     setTaxId('');
     setPaymentTerms('');
     setDefaultCurrency('USD');
@@ -187,20 +198,12 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
     setResetConfirmOpen(false);
   }, []);
 
-  const handleDelete = React.useCallback(() => {
-    if (!relationshipId || !sourceOrgId) return;
-    startTransition(async () => {
-      const result = await softDeleteGhostRelationship(relationshipId, sourceOrgId);
-      setDeleteConfirmOpen(false);
-      if (result.ok) {
-        toast.success('Connection deleted. You can restore it within 30 days from the Network page.');
-        router.push(returnPath);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }, [relationshipId, sourceOrgId, router]);
+  const handleDelete = useConnectionDelete({
+    relationshipId: relationshipId || null,
+    sourceOrgId,
+    returnPath,
+    name: name || details.identity.name || 'Connection',
+  });
 
   const handleEnrich = React.useCallback(
     (data: ScoutResult) => {
@@ -254,11 +257,13 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         formData.set('address_postal_code', mergedAddress.postal_code);
         formData.set('address_country', mergedAddress.country);
         formData.set('category', relType === 'client' ? 'client' : relType === 'partner' ? 'coordinator' : relType);
-        formData.set('taxId', taxId);
+        formData.set('w9Status', String(w9Status));
+      formData.set('coiExpiry', coiExpiry);
+      formData.set('taxId', taxId);
         formData.set('paymentTerms', paymentTerms);
         formData.set('defaultCurrency', defaultCurrency);
 
-        const [profileResult, relResult, notesResult] = await Promise.all([
+        const [profileResult, relResult] = await Promise.all([
           updateGhostProfile(ghostOrgId, formData),
           updateRelationshipMeta(relationshipId, sourceOrgId, {
             type: (relType === 'client' ? 'client_company' : relType) as 'vendor' | 'venue' | 'client_company' | 'partner',
@@ -266,13 +271,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             blacklistReason: lifecycle === 'blacklisted' ? blacklistReason : null,
             tags: mergedTags.length ? mergedTags : null,
           }),
-          updateRelationshipNotes(relationshipId, notes),
         ]);
 
         const err =
           profileResult.error ||
-          (relResult.ok === false ? relResult.error : null) ||
-          (notesResult.ok === false ? notesResult.error : null);
+          (relResult.ok === false ? relResult.error : null);
         if (err) {
           toast.error(err);
           return;
@@ -313,10 +316,15 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       relType,
       lifecycle,
       blacklistReason,
-      notes,
       taxId,
       paymentTerms,
       defaultCurrency,
+      // Enrich rebuilds the whole FormData, compliance included. Leaving these
+      // out meant a scout run after editing the W-9 would post the values the
+      // page loaded with.
+      w9Status,
+      coiExpiry,
+      router,
     ]
   );
 
@@ -341,11 +349,13 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
       formData.set('address_postal_code', address.postal_code);
       formData.set('address_country', address.country);
       formData.set('category', relType === 'client' ? 'client' : relType === 'partner' ? 'coordinator' : relType);
+      formData.set('w9Status', String(w9Status));
+      formData.set('coiExpiry', coiExpiry);
       formData.set('taxId', taxId);
       formData.set('paymentTerms', paymentTerms);
       formData.set('defaultCurrency', defaultCurrency);
 
-      const [profileResult, relResult, notesResult] = await Promise.all([
+      const [profileResult, relResult] = await Promise.all([
         updateGhostProfile(ghostOrgId, formData),
         updateRelationshipMeta(relationshipId, sourceOrgId, {
           type: (relType === 'client' ? 'client_company' : relType) as 'vendor' | 'venue' | 'client_company' | 'partner',
@@ -353,10 +363,9 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
           blacklistReason: lifecycle === 'blacklisted' ? blacklistReason : null,
           tags: localTags.length ? localTags : null,
         }),
-        updateRelationshipNotes(relationshipId, notes),
       ]);
 
-      const err = profileResult.error || (relResult.ok === false ? relResult.error : null) || (notesResult.ok === false ? notesResult.error : null);
+      const err = profileResult.error || (relResult.ok === false ? relResult.error : null);
       if (err) {
         toast.error(err);
       } else {
@@ -378,58 +387,98 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
   };
 
   return (
-    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)]  border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" strokeWidth={1.5} />
-          </Button>
-          <div>
-            <p className="stage-label">
-              Profile
-            </p>
-            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-              {name || 'Untitled Entity'}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={STAGE_MEDIUM}
-              className="flex items-center gap-3"
-            >
-              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                className="gap-2 stage-btn stage-btn-primary"
-              >
-                <Save className="size-4" strokeWidth={1.5} />
-                Save
-              </Button>
-            </motion.div>
+    <EntityRecordShell
+      entityId={details.subjectEntityId ?? null}
+      entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue' | null) ?? 'company'}
+      workspaceId={workspaceId ?? null}
+      name={name || details.identity.name || ''}
+      eyebrow={details.identity.label}
+      avatarUrl={details.identity.avatarUrl}
+      avatarType={details.entityDirectoryType as 'person' | 'company' | 'venue' | 'couple' | undefined}
+      returnPath={returnPath}
+      sourceOrgId={sourceOrgId}
+      doNotRebook={details.doNotRebook}
+      dirty={hasChanges}
+      saving={isPending}
+      onSave={handleSave}
+      actions={[
+        { label: 'Reset all fields', onSelect: () => setResetConfirmOpen(true) },
+        ...(handleDelete
+          ? [{ label: 'Remove connection', onSelect: handleDelete, critical: true }]
+          : []),
+      ]}
+    >
+          {/* What we know, above what you edit -- the same column order the
+              person pages carry. This page had none of it: no brief, no
+              captures, and a Notes accordion that was a second editor for the
+              relationship note the capture panel already composes. */}
+          {details.subjectEntityId && workspaceId && (
+            <EntityKnowledgeCards
+              workspaceId={workspaceId}
+              entityId={details.subjectEntityId}
+              entityType={(details.entityDirectoryType as 'company' | 'venue') ?? 'company'}
+              entityName={name || details.identity.name || null}
+              relationshipId={details.relationshipId}
+            />
           )}
-        </AnimatePresence>
-      </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-3">
-          {/* Overview cards — Brief, Team, Captures */}
-          {workspaceId && details.subjectEntityId && (() => {
-            const t = details.entityDirectoryType === 'venue' ? 'venue' : 'company';
-            return (
-              <EntityOverviewCards
-                workspaceId={workspaceId}
-                entityId={details.subjectEntityId}
-                entityType={t}
-                entityName={name || details.identity.name || null}
-                density="page"
-              />
-            );
-          })()}
+          <AccordionSection label="Classification" icon={Tag} defaultOpen>
+            <div className="space-y-2">
+              <div>
+                <label className={LABEL}>Relationship role</label>
+                <select
+                  value={relType}
+                  onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
+                  className="stage-input mt-1 w-full"
+                >
+                  <option value="vendor">Vendor</option>
+                  <option value="client">Client</option>
+                  <option value="partner">Partner</option>
+                </select>
+              </div>
+              <div>
+                <label className={LABEL}>Lifecycle</label>
+                <select
+                  value={lifecycle}
+                  onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
+                  className="stage-input mt-1 w-full"
+                >
+                  <option value="prospect">Prospect</option>
+                  <option value="active">Active</option>
+                  <option value="dormant">Dormant</option>
+                  <option value="blacklisted">Blacklisted</option>
+                </select>
+              </div>
+              {lifecycle === 'blacklisted' && (
+                <div>
+                  <label className={LABEL}>Blacklist reason</label>
+                  <Input
+                    value={blacklistReason}
+                    onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
+                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+                  />
+                </div>
+              )}
+              <div>
+                <label className={LABEL}>Tags</label>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {localTags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] px-2 py-0.5 text-xs"
+                    >
+                      {t}
+                      <button type="button" onClick={() => { setLocalTags(localTags.filter((x) => x !== t)); markChanged(); }}>×</button>
+                    </span>
+                  ))}
+                  <div className="flex gap-1">
+                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[var(--ctx-well)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
+                    <Button type="button" variant="ghost" size="sm" onClick={addTag}>Add</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </AccordionSection>
 
           <AccordionSection label="Identity" icon={Building2} defaultOpen>
             <div className="space-y-3">
@@ -505,7 +554,11 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             </div>
           </AccordionSection>
 
-          <AccordionSection label="Intelligence" icon={Radar} defaultOpen>
+          {/* Was "Intelligence", which names the scout box at the top and
+              nothing else in here. Everything under it is how you reach them:
+              email, phone, address. A label that describes one control and
+              hides the other six is a label people learn to skip. */}
+          <AccordionSection label="Contact" icon={AtSign} defaultOpen>
             <div className="space-y-3">
               <AionScoutInput
                 value={website}
@@ -578,63 +631,38 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             </div>
           </AccordionSection>
 
-          <AccordionSection label="Classification" icon={Tag} defaultOpen>
-            <div className="space-y-2">
-              <div>
-                <label className={LABEL}>Relationship role</label>
-                <select
-                  value={relType}
-                  onChange={(e) => { setRelType(e.target.value as 'vendor' | 'partner' | 'client'); markChanged(); }}
-                  className="stage-input mt-1 w-full"
-                >
-                  <option value="vendor">Vendor</option>
-                  <option value="client">Client</option>
-                  <option value="partner">Partner</option>
-                </select>
-              </div>
-              <div>
-                <label className={LABEL}>Lifecycle</label>
-                <select
-                  value={lifecycle}
-                  onChange={(e) => { setLifecycle(e.target.value as 'prospect' | 'active' | 'dormant' | 'blacklisted'); markChanged(); }}
-                  className="stage-input mt-1 w-full"
-                >
-                  <option value="prospect">Prospect</option>
-                  <option value="active">Active</option>
-                  <option value="dormant">Dormant</option>
-                  <option value="blacklisted">Blacklisted</option>
-                </select>
-              </div>
-              {lifecycle === 'blacklisted' && (
+          {/* Compliance. The add-connection sheet asks a vendor for a W-9 and a
+              COI expiry at the moment you know them, and this page had nowhere
+              to show either -- so they were collected and never seen again. */}
+          {(relType === 'vendor' || relType === 'partner') && (
+            <AccordionSection label="Compliance" icon={ShieldCheck}>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={w9Status}
+                    onChange={(e) => { setW9Status(e.target.checked); markChanged(); }}
+                    className="size-4 rounded border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]"
+                  />
+                  <span className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
+                    W-9 on file
+                  </span>
+                </label>
                 <div>
-                  <label className={LABEL}>Blacklist reason</label>
+                  <label className={LABEL}>COI expiry</label>
+                  <p className="stage-label text-[var(--stage-text-tertiary)] mt-0.5 mb-1.5">
+                    Certificate of Insurance expiry date — used for compliance tracking.
+                  </p>
                   <Input
-                    value={blacklistReason}
-                    onChange={(e) => { setBlacklistReason(e.target.value); markChanged(); }}
-                    className="mt-1 bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
+                    type="date"
+                    value={coiExpiry}
+                    onChange={(e) => { setCoiExpiry(e.target.value); markChanged(); }}
+                    className="bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
                   />
                 </div>
-              )}
-              <div>
-                <label className={LABEL}>Tags</label>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {localTags.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-[oklch(1_0_0/0.08)] text-[var(--stage-text-secondary)] px-2 py-0.5 text-xs"
-                    >
-                      {t}
-                      <button type="button" onClick={() => { setLocalTags(localTags.filter((x) => x !== t)); markChanged(); }}>×</button>
-                    </span>
-                  ))}
-                  <div className="flex gap-1">
-                    <Input id="tag-input" placeholder="Add tag" className="w-24 h-8 text-xs bg-[var(--ctx-well)]" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} />
-                    <Button type="button" variant="ghost" size="sm" onClick={addTag}>Add</Button>
-                  </div>
-                </div>
               </div>
-            </div>
-          </AccordionSection>
+            </AccordionSection>
+          )}
 
           {(relType === 'vendor' || relType === 'partner') && (
             <AccordionSection label="Financial" icon={DollarSign}>
@@ -672,16 +700,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
             />
           )}
 
-          <AccordionSection label="Notes" icon={FileText} defaultOpen>
-            <Textarea
-              value={notes}
-              onChange={(e) => { setNotes(e.target.value); markChanged(); }}
-              placeholder="Internal notes about this partner…"
-              className="min-h-[100px] resize-y bg-[var(--ctx-well)] border-[var(--stage-edge-subtle)]"
-              rows={4}
-            />
-          </AccordionSection>
-
           <AccordionSection label="Roster" icon={Users}>
             <RosterSection
               crew={details.crew ?? []}
@@ -690,53 +708,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               onRefresh={() => router.refresh()}
             />
           </AccordionSection>
-
-          {details.subjectEntityId && (
-            <>
-              <AssignmentsPanel entityId={details.subjectEntityId} />
-              <DealsPanel entityId={details.subjectEntityId} />
-              <FinancePanel entityId={details.subjectEntityId} />
-            </>
-          )}
-
-          {details.subjectEntityId && workspaceId && (
-            <EntityDocumentsCard
-              entityId={details.subjectEntityId}
-              entityType={(details.entityDirectoryType as 'person' | 'company' | 'venue') ?? 'company'}
-              workspaceId={workspaceId}
-            />
-          )}
-
-          <section className="stage-panel rounded-2xl overflow-hidden" data-surface="surface">
-            <div className="px-5 py-4 border-b border-[var(--stage-edge-subtle)]">
-              <h3 className="stage-label">
-                Danger zone
-              </h3>
-            </div>
-            <div className="px-5 py-4 flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setResetConfirmOpen(true)}
-                className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
-              >
-                <RotateCcw className="size-4" strokeWidth={1.5} />
-                Reset all fields
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteConfirmOpen(true)}
-                className="gap-2 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-              >
-                <Trash2 className="size-4" strokeWidth={1.5} />
-                Delete connection
-              </Button>
-            </div>
-          </section>
-      </div>
 
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
         <DialogContent className="max-w-sm">
@@ -758,114 +729,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete this connection?</DialogTitle>
-            <DialogClose />
-          </DialogHeader>
-          <p className="px-6 pb-6 text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
-            This connection will be removed from your network. You can restore it within 30 days from the Network page. After that it may be permanently deleted.
-          </p>
-          <div className="flex gap-3 px-6 pb-6">
-            <Button variant="outline" size="sm" onClick={() => setDeleteConfirmOpen(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleDelete}
-              disabled={isPending}
-              className="flex-1 border-[var(--color-unusonic-error)]/50 text-[var(--color-unusonic-error)] hover:bg-[var(--color-unusonic-error)]/10"
-            >
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function RosterSection({
-  crew,
-  sourceOrgId,
-  ghostOrgId,
-  onRefresh,
-}: {
-  crew: NodeDetailCrewMember[];
-  sourceOrgId: string;
-  ghostOrgId: string;
-  onRefresh: () => void;
-}) {
-  const [showAdd, setShowAdd] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
-  const addRef = React.useRef<HTMLDivElement>(null);
-
-  const handleAdd = async () => {
-    const el = addRef.current;
-    if (!el) return;
-    const get = (n: string) => (el.querySelector(`[name="${n}"]`) as HTMLInputElement)?.value?.trim() ?? '';
-    setSaving(true);
-    const result = await addContactToGhostOrg(sourceOrgId, ghostOrgId, {
-      firstName: get('ac_firstName') || 'Contact',
-      lastName: get('ac_lastName'),
-      email: get('ac_email') || undefined,
-      role: get('ac_role') || undefined,
-      jobTitle: get('ac_jobTitle') || undefined,
-    });
-    setSaving(false);
-    if (result.ok) {
-      setShowAdd(false);
-      onRefresh();
-    } else {
-      toast.error(result.error ?? 'Failed to add contact');
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <ul className="space-y-2">
-        {crew.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-card)] px-3 py-2">
-            <div className="size-10 rounded-full bg-[var(--stage-surface-raised)] flex items-center justify-center overflow-hidden">
-              {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="size-full object-cover" loading="lazy" /> : <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">{(m.name?.[0] ?? '?').toUpperCase()}</span>}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[length:var(--stage-data-size)] font-medium text-[var(--stage-text-primary)]">{m.name}</p>
-              {(() => {
-                const visibleEmail = displayableEmail(m.email);
-                const subtitle = [m.jobTitle, visibleEmail].filter(Boolean).join(' · ');
-                return subtitle ? (
-                  <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)] truncate">{subtitle}</p>
-                ) : null;
-              })()}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {!showAdd ? (
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2 border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]">
-          Add contact
-        </Button>
-      ) : (
-        <div ref={addRef} className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_firstName" placeholder="First name" className="bg-[var(--ctx-well)]" />
-            <Input name="ac_lastName" placeholder="Last name" className="bg-[var(--ctx-well)]" />
-          </div>
-          <Input name="ac_email" type="email" placeholder="Email" className="bg-[var(--ctx-well)]" />
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="ac_role" placeholder="Role" className="bg-[var(--ctx-well)]" />
-            <Input name="ac_jobTitle" placeholder="Job title" className="bg-[var(--ctx-well)]" />
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleAdd} disabled={saving} className="border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)]">
-              {saving ? 'Saving…' : 'Add'}
-            </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setShowAdd(false)}>Cancel</Button>
-          </div>
-        </div>
-      )}
-    </div>
+    </EntityRecordShell>
   );
 }

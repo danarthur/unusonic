@@ -7,7 +7,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/shared/api/supabase/server';
 import { getEntityCrewSchedule } from '@/features/ops/actions/get-entity-crew-schedule';
-import { getEntityDeals, getEntityFinancialSummary } from '@/features/network-data/api/entity-context-actions';
+import { getEntityMoney } from '@/features/network-data/api/get-entity-money';
+import { getEntityProductions } from '@/widgets/network-detail/api/get-entity-productions';
 import { toIONContext } from '@/shared/lib/entity-attrs';
 import { envelope } from '../../../lib/retrieval-envelope';
 import { getSubstrateCounts } from '../../../lib/substrate-counts';
@@ -95,8 +96,9 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         }
       }
 
-      const deals = await getEntityDeals(entityId);
-      const invoices = await getEntityFinancialSummary(entityId);
+      const productionsResult = await getEntityProductions(workspaceId, entityId);
+      const deals = productionsResult.ok ? productionsResult.productions : [];
+      const money = await getEntityMoney(entityId);
       const searched = await getSubstrateCounts(workspaceId);
 
       return envelope({
@@ -105,9 +107,15 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         name: (entity as any).display_name,
         type: entityType,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        isGhost: !(entity as any).claimed_by_user_id, attributes: attrs,
-        relationships, deals: deals.slice(0, 5), openInvoices: invoices,
+        /*
+          `isGhost` is not sent. It is an internal marker meaning "has not
+          signed up yet", and handing it to a model is how an owner was told
+          that a real coordinator "is a ghost". Whether somebody has an account
+          is almost never the answer to a question about a show; when it is, it
+          belongs in the tool that asks it, phrased for a person.
+        */
+        attributes: attrs,
+        relationships, deals: deals.slice(0, 5), openInvoices: money.openInvoices,
       }, searched);
     },
   });
@@ -139,12 +147,16 @@ export function createEntityKnowledgeTools(ctx: AionToolContext, helpers: Resolv
         const searched = await getSubstrateCounts(workspaceId);
         return envelope(null, searched, { reason: 'entity_not_found', hint: 'No entity ID provided and no entity in view.' });
       }
-      const [invoices, deals] = await Promise.all([getEntityFinancialSummary(entityId), getEntityDeals(entityId)]);
+      const [money, productionsResult] = await Promise.all([
+        getEntityMoney(entityId),
+        getEntityProductions(workspaceId, entityId),
+      ]);
+      const deals = productionsResult.ok ? productionsResult.productions : [];
       const searched = await getSubstrateCounts(workspaceId);
-      const hasData = invoices.length > 0 || deals.length > 0;
+      const hasData = money.invoices.length > 0 || deals.length > 0;
       return envelope({
-        openInvoices: invoices, totalOutstanding: invoices.reduce((sum, inv) => sum + (inv.total_amount ?? 0), 0),
-        deals: deals.slice(0, 10).map((d) => ({ id: d.id, eventType: d.event_archetype, status: d.status, date: d.proposed_date, budget: d.budget_estimated })),
+        openInvoices: money.openInvoices, totalOutstanding: money.theyOweUs, weOweThem: money.weOweThem,
+        deals: deals.slice(0, 10).map((d) => ({ id: d.id, eventType: d.archetype, status: d.status, date: d.date, budget: d.amountEstimated })),
       }, searched, {
         reason: !hasData ? 'no_open_invoices' : 'has_data',
       });

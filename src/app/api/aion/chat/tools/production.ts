@@ -29,6 +29,7 @@ async function resolveEventId(
   if (explicitEventId) {
     const supabase = await createClient();
     const { data: event } = await supabase
+      .schema('ops')
       .from('events')
       .select('id')
       .eq('id', explicitEventId)
@@ -357,6 +358,7 @@ export function createProductionTools(ctx: AionToolContext) {
       // Resolve the assignment ID from event + entity
       const supabase = await createClient();
       const { data: assignment } = await supabase
+        .schema('ops')
         .from('deal_crew')
         .select('id')
         .eq('event_id', resolved.eventId)

@@ -35,12 +35,16 @@ export async function getEventSignals(eventId: string): Promise<EventSignal[]> {
 
   const supabase = await createClient();
 
-  // 1. Event basics — start time + linked deal id. ops schema is exposed
-  // via PostgREST per the recent grants migration; cast through unknown
-  // because supabase-js generic types only cover the public schema.
-  const { data: eventRow } = await (supabase as unknown as {
-    schema: (s: string) => typeof supabase;
-  })
+  /*
+    1. Event basics — start time + linked deal id.
+
+    The three `as unknown as { schema: ... }` casts this file carried were a
+    workaround for generated types that only covered the public schema. They
+    have covered all six since PR 6.5, and the cast was no longer a workaround:
+    it replaced the row type with `unknown` and let `.eq('invoice_kind', ...)`
+    through against a column list nobody was checking.
+  */
+  const { data: eventRow } = await supabase
     .schema('ops')
     .from('events')
     .select('id, starts_at, deal_id')
@@ -87,9 +91,7 @@ export async function getEventSignals(eventId: string): Promise<EventSignal[]> {
   // handles the null case).
   let finalInvoice: { status: string | null } | null = null;
   if (dealId) {
-    const { data: invoiceRows } = await (supabase as unknown as {
-      schema: (s: string) => typeof supabase;
-    })
+    const { data: invoiceRows } = await supabase
       .schema('finance')
       .from('invoices')
       .select('status')
@@ -106,9 +108,7 @@ export async function getEventSignals(eventId: string): Promise<EventSignal[]> {
   // come from the Replies inbound mirror once Phase 1 ships.
   let lastFollowUpAt: string | null = null;
   if (dealId) {
-    const { data: logRows } = await (supabase as unknown as {
-      schema: (s: string) => typeof supabase;
-    })
+    const { data: logRows } = await supabase
       .schema('ops')
       .from('follow_up_log')
       .select('created_at')

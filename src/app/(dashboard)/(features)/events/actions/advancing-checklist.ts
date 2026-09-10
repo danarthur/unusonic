@@ -5,6 +5,7 @@ import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { AdvancingChecklistItem } from '../lib/advancing-checklist-types';
 import { DEFAULT_CHECKLIST_ITEMS, ARCHETYPE_TEMPLATES } from '../lib/advancing-checklist-types';
+import type { Json } from '@/types/supabase';
 
 const uuidSchema = z.string().uuid();
 
@@ -45,7 +46,7 @@ async function writeChecklist(
   const { error } = await supabase
     .schema('ops')
     .from('events')
-    .update({ advancing_checklist: items as unknown as Record<string, unknown> })
+    .update({ advancing_checklist: items as unknown as Json })
     .eq('id', eventId)
     .eq('workspace_id', workspaceId);
 

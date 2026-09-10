@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (!membership || !['owner', 'admin'].includes(membership.role)) {
+  if (!membership?.role || !['owner', 'admin'].includes(membership.role)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
   }
 

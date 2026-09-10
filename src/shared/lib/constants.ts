@@ -18,7 +18,6 @@ export const SITE_CONFIG = {
 // API Routes
 export const API_ROUTES = {
   aion: '/api/aion',
-  capture: '/api/capture',
 } as const;
 
 // Session / trust & inactivity (client-side UX; no DB/RLS)

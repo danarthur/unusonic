@@ -84,7 +84,7 @@ export function MemberDetailSheet({
   const [addSkillTag, setAddSkillTag] = React.useState('');
   const [role, setRole] = React.useState<UnusonicRoleId>((member?.role as UnusonicRoleId) ?? 'member');
   const [workspaceMember, setWorkspaceMember] = React.useState<{
-    workspaceMemberId: string;
+    userId: string;
     roleId: string | null;
   } | null>(null);
 
@@ -345,7 +345,7 @@ export function MemberDetailSheet({
                         <WorkspaceRoleSelect
                           label="Workspace role"
                           workspaceId={workspaceId}
-                          memberId={workspaceMember.workspaceMemberId}
+                          userId={workspaceMember.userId}
                           value={workspaceMember.roleId}
                           onSuccess={() => {
                             onSuccess?.();

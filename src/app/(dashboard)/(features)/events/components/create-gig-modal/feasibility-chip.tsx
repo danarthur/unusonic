@@ -235,7 +235,7 @@ function FeasibilityPopover({
               }
             : { position: 'fixed', visibility: 'hidden' }
         }
-        className="max-h-[60vh] overflow-y-auto rounded-[var(--stage-radius-card,10px)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
+        className="max-h-[60vh] overflow-y-auto rounded-[var(--stage-radius-panel)] border border-[oklch(1_0_0_/_0.10)] bg-[var(--ctx-dropdown)] shadow-[0_8px_32px_oklch(0_0_0/0.5)]"
       >
         <header className="px-3 py-2.5 border-b border-[oklch(1_0_0_/_0.06)] sticky top-0 bg-[var(--ctx-dropdown)] z-10">
           <h2 className="text-[length:var(--stage-input-font-size,13px)] font-medium tracking-tight text-[var(--stage-text-primary)]">

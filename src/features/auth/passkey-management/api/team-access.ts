@@ -50,7 +50,7 @@ export async function getTeamAccessData(
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (!callerMember || !['owner', 'admin'].includes(callerMember.role)) {
+  if (!callerMember?.role || !['owner', 'admin'].includes(callerMember.role)) {
     return null;
   }
 

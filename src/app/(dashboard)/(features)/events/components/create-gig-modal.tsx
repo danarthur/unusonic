@@ -31,6 +31,7 @@ import {
 } from './create-gig-modal/host-cast-forms';
 import { CastSummary } from './create-gig-modal/cast-summary';
 import { humanizeSlug } from '@/shared/lib/event-archetype';
+import { coupleDisplayName } from '@/entities/network/model/couple-name';
 import { DateStage, type DateKind } from './create-gig-modal/date-stage';
 import { PocSelector, type PocChoice, type PocOption } from './create-gig-modal/poc-selector';
 import { PlannerPicker } from './create-gig-modal/planner-picker';
@@ -272,16 +273,7 @@ export function CreateGigModal({ open, onClose, addOptimisticGig, onRefetchList 
   // ── Derived display labels ────────────────────────────────────────────────
   const coupleAutoDisplayName = useMemo(() => {
     if (hostKind !== 'couple') return '';
-    const aF = partnerA.firstName.trim();
-    const aL = partnerA.lastName.trim();
-    const bF = partnerB.firstName.trim();
-    const bL = partnerB.lastName.trim();
-    if (!aF && !bF) return '';
-    const sameLast = aL && bL && aL.toLowerCase() === bL.toLowerCase();
-    if (sameLast) return `${aF} & ${bF} ${aL}`.trim();
-    const a = [aF, aL].filter(Boolean).join(' ');
-    const b = [bF, bL].filter(Boolean).join(' ');
-    return [a, b].filter(Boolean).join(' & ');
+    return coupleDisplayName(partnerA, partnerB);
   }, [hostKind, partnerA, partnerB]);
 
   const optimisticClientName = (() => {

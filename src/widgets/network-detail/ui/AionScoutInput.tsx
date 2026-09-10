@@ -37,7 +37,7 @@ export function AionScoutInput({ value, onChange, onEnrich }: AionScoutInputProp
     const result = await scoutEntity(value.trim());
 
     if ('error' in result) {
-      toast.error(result.error, { id: toastId });
+      toast.error(result.error, { id: toastId, duration: Infinity });
       setStatus('ready');
     } else {
       toast.success('Scan complete', { id: toastId });

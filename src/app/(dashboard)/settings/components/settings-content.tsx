@@ -15,16 +15,10 @@ import {
   User,
   Building2,
   Plug2,
-  Camera,
   Check,
-  X,
   Loader2,
   ExternalLink,
   Sparkles,
-  Copy,
-  RefreshCw,
-  MapPin,
-  Plus,
   Clock,
   Palette,
   Shield,
@@ -42,7 +36,7 @@ import { CeramicSwitch } from '@/shared/ui/switch';
 import { useSoundStore } from '@/shared/lib/sound/sound-store';
 import { SoundEngine } from '@/shared/lib/sound/sound-engine';
 import type { SoundName } from '@/shared/lib/sound/sounds';
-import type { WorkspaceMemberData, LocationData } from '@/app/actions/workspace';
+import type { WorkspaceMemberData } from '@/app/actions/workspace';
 import { updateWorkspacePaymentDefaults, type WorkspacePaymentDefaults } from '@/features/org-management/api/payment-defaults-actions';
 
 interface SettingsData {
@@ -58,7 +52,6 @@ interface SettingsData {
     id: string;
     name: string;
     role: 'owner' | 'admin' | 'member' | 'viewer';
-    inviteCode: string | null;
     subscriptionTier?: 'foundation' | 'growth' | 'venue_os' | 'autonomous';
   } | null;
   integrations: {
@@ -66,7 +59,6 @@ interface SettingsData {
     qboRealmId?: string | null;
   };
   members: WorkspaceMemberData[];
-  locations: LocationData[];
   paymentDefaults: WorkspacePaymentDefaults | null;
 }
 
@@ -393,66 +385,15 @@ export function SettingsContent({ data, searchParams }: SettingsContentProps) {
             </div>
           </div>
           
-          {/* Invite Code - Owners/Admins Only */}
-          {(data.workspace.role === 'owner' || data.workspace.role === 'admin') && data.workspace.inviteCode && (
-            <div className="p-4 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="stage-field-label mb-1">
-                    Invite Code
-                  </p>
-                  <p className="text-lg font-mono font-medium text-[var(--stage-text-secondary)] tracking-widest">
-                    {data.workspace.inviteCode}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(data.workspace!.inviteCode!);
-                  }}
-                  className="stage-hover overflow-hidden p-2.5 rounded-xl bg-[var(--ctx-well)] text-[var(--stage-text-secondary)] transition-colors"
-                  title="Copy invite code"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-              </div>
-              <p className="text-xs text-[var(--stage-text-secondary)] mt-2">
-                Share this code with team members to invite them
-              </p>
-            </div>
-          )}
-          
-          {/* Locations */}
-          {data.locations.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <MapPin className="w-4 h-4 text-[var(--stage-text-secondary)]" />
-                <span className="text-xs font-medium text-[var(--stage-text-secondary)] uppercase tracking-wider">
-                  Locations
-                </span>
-              </div>
-              <div className="space-y-2">
-                {data.locations.map((location) => (
-                  <div 
-                    key={location.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-[var(--stage-surface-elevated)] border border-[var(--stage-border)]"
-                  >
-                    <div className={`w-2 h-2 rounded-full ${location.isPrimary ? 'bg-[var(--color-unusonic-success)]' : 'bg-[var(--stage-border-hover)]'}`} />
-                    <div className="flex-1">
-                      <p className="text-sm text-[var(--stage-text-primary)]">{location.name}</p>
-                      {location.address && (
-                        <p className="text-xs text-[var(--stage-text-secondary)]">{location.address}</p>
-                      )}
-                    </div>
-                    {location.isPrimary && (
-                      <span className="stage-label text-[var(--color-unusonic-success)]">
-                        Primary
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/*
+            The invite-code panel and the locations list stood here.
+
+            `workspaces.invite_code` and the `locations` table do not exist, so
+            the code was always null and the list always empty -- both blocks
+            rendered nothing, every time, for everyone. Inviting someone goes
+            through Team Members, which sends a real invitation; a place a show
+            happens is a venue in Network.
+          */}
         </motion.section>
       )}
 

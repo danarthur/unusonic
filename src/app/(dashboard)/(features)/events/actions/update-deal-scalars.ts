@@ -7,7 +7,9 @@ import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 
 const UpdateDealScalarsSchema = z.object({
   title: z.string().min(1).max(200).nullable().optional(),
-  proposed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  // NOT NULL on public.deals. Accepting null here would have produced a
+  // constraint violation surfaced as a generic save failure.
+  proposed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   event_archetype: z.enum(['wedding', 'corporate', 'concert', 'festival', 'private', 'conference', 'other']).nullable().optional(),
   budget_estimated: z.number().min(0).nullable().optional(),
   lead_source: z.string().nullable().optional(),

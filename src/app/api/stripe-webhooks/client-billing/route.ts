@@ -20,7 +20,7 @@ import * as Sentry from '@sentry/nextjs';
 import { getStripe } from '@/shared/api/stripe/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import type { Json } from '@/types/supabase';
-import { recordPaymentFromWebhook } from '@/features/finance/api/invoice-actions';
+import { recordPaymentFromWebhook } from '@/features/finance/api/record-payment-internal';
 
 export const runtime = 'nodejs';
 

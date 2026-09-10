@@ -68,12 +68,44 @@ export async function generateRosPrintHtml(eventId: string): Promise<string> {
     .eq('id', eventId)
     .single();
 
-  // Fetch client name via deal
+  /*
+    The client, from the deal's bill-to stakeholder.
+
+    This used to read `deals.client_name`, a column that does not exist -- the
+    select answered 400, `deal` came back null, and the printed run-of-show has
+    always said "—" where the client's name belongs. Who a deal is for lives in
+    `ops.deal_stakeholders`, with `deals.organization_id` as the older fallback.
+  */
   const { data: deal } = await supabase
     .from('deals')
-    .select('title, client_name')
+    .select('id, organization_id')
     .eq('event_id', eventId)
     .maybeSingle();
+
+  let clientName: string | null = null;
+  if (deal) {
+    const { data: billTo } = await supabase
+      .schema('ops')
+      .from('deal_stakeholders')
+      .select('organization_id, entity_id')
+      .eq('deal_id', deal.id)
+      .eq('role', 'bill_to')
+      .limit(1)
+      .maybeSingle();
+
+    const clientEntityId =
+      billTo?.organization_id ?? billTo?.entity_id ?? deal.organization_id ?? null;
+
+    if (clientEntityId) {
+      const { data: clientEntity } = await supabase
+        .schema('directory')
+        .from('entities')
+        .select('display_name')
+        .eq('id', clientEntityId)
+        .maybeSingle();
+      clientName = clientEntity?.display_name ?? null;
+    }
+  }
 
   const meta: EventMeta = {
     title: event?.title ?? 'Untitled Show',
@@ -81,7 +113,7 @@ export async function generateRosPrintHtml(eventId: string): Promise<string> {
       ? new Date(event.starts_at).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
       : 'TBD',
     venue: event?.venue_name ?? event?.location_name ?? '—',
-    client: deal?.client_name ?? '—',
+    client: clientName ?? '—',
   };
 
   const [cues, sections] = await Promise.all([fetchCues(eventId), fetchSections(eventId)]);

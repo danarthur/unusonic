@@ -5,6 +5,7 @@
 
 import type { NetworkNode } from '@/entities/network';
 import { PERSON_ATTR, COUPLE_ATTR } from '../../model/attribute-keys';
+import { deriveRoleFromDealActivity } from '@/entities/network/model/derive-role';
 
 export async function fetchStarredEntityIds(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-schema row shape is resolved at runtime; narrowing here would duplicate the generated types.
@@ -293,4 +294,121 @@ function readJobTitle(
   if (fromEdge) return fromEdge;
   const fromProfile = (attributes ?? {})[PERSON_ATTR.job_title] as string | null | undefined;
   return fromProfile ?? null;
+}
+
+/**
+ * People who have actually worked a deal with this workspace but whom nobody
+ * ever filed with a direct relationship edge.
+ *
+ * Without this, reaching the contacts page depends on someone having drawn an
+ * edge -- which sorts by data-entry accident rather than by relationship. Alexa
+ * Infranca had worked TWO deals as planner and appeared nowhere on the page,
+ * while three people with zero deals each had cards. Deal involvement is the
+ * better evidence and it maintains itself: someone shows up the day they run
+ * their first show.
+ *
+ * `excludeEntityIds` are the people already built from edges, so nobody is
+ * added twice.
+ */
+export async function fetchWorkedWithNodes(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.from() are used.
+  supabase: any,
+  workspaceId: string | null,
+  excludeEntityIds: Set<string>,
+): Promise<NetworkNode[]> {
+  if (!workspaceId) return [];
+
+  const [stakeholderRes, crewRes] = await Promise.all([
+    supabase.schema('ops').from('deal_stakeholders').select('entity_id, role'),
+    supabase.schema('ops').from('deal_crew').select('entity_id').eq('workspace_id', workspaceId),
+  ]);
+
+  const { rolesByEntity, crewIds } = collectDealActivity(
+    stakeholderRes.data,
+    crewRes.data,
+    excludeEntityIds,
+  );
+
+  const candidateIds = [...new Set([...rolesByEntity.keys(), ...crewIds])];
+  if (candidateIds.length === 0) return [];
+
+  const { data: people } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('id, display_name, avatar_url, attributes, type')
+    .in('id', candidateIds)
+    .eq('owner_workspace_id', workspaceId)
+    .in('type', ['person', 'couple']);
+
+  return ((people ?? []) as WorkedWithPerson[])
+    .map((p) => buildWorkedWithNode(p, rolesByEntity.get(p.id) ?? [], crewIds.has(p.id)))
+    .filter((n): n is NetworkNode => n !== null);
+}
+
+type WorkedWithPerson = {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  attributes: Record<string, unknown> | null;
+  type: string;
+};
+
+const DERIVED_ROLE_LABEL: Record<string, string> = {
+  CLIENT: 'Client',
+  VENDOR: 'Vendor',
+  ROSTER_MEMBER: 'Team',
+};
+
+/** Index deal involvement per entity, skipping anyone already built from edges. */
+function collectDealActivity(
+  stakeholders: unknown[] | null | undefined,
+  crew: unknown[] | null | undefined,
+  excludeEntityIds: Set<string>,
+): { rolesByEntity: Map<string, string[]>; crewIds: Set<string> } {
+  const rolesByEntity = new Map<string, string[]>();
+  for (const r of ((stakeholders ?? []) as { entity_id: string | null; role: string }[])) {
+    if (!r.entity_id || excludeEntityIds.has(r.entity_id)) continue;
+    const list = rolesByEntity.get(r.entity_id) ?? [];
+    list.push(r.role);
+    rolesByEntity.set(r.entity_id, list);
+  }
+
+  const crewIds = new Set<string>();
+  for (const r of ((crew ?? []) as { entity_id: string | null }[])) {
+    if (r.entity_id && !excludeEntityIds.has(r.entity_id)) crewIds.add(r.entity_id);
+  }
+  return { rolesByEntity, crewIds };
+}
+
+/**
+ * Null when the evidence says only that someone was reachable on the day --
+ * they stay off the page rather than being filed on a guess.
+ */
+function buildWorkedWithNode(
+  p: WorkedWithPerson,
+  stakeholderRoles: string[],
+  workedAsCrew: boolean,
+): NetworkNode | null {
+  const role = deriveRoleFromDealActivity(stakeholderRoles, workedAsCrew);
+  if (!role) return null;
+
+  const attrs = p.attributes ?? {};
+  return {
+    id: `worked-with-${p.id}`,
+    entityId: p.id,
+    kind: 'external_partner',
+    gravity: 'outer_orbit',
+    relationshipType: role,
+    roles: [role],
+    identity: {
+      name: p.display_name ?? 'Unnamed',
+      avatarUrl: p.avatar_url,
+      label: DERIVED_ROLE_LABEL[role] ?? 'Contact',
+      entityType: p.type as 'person' | 'couple',
+    },
+    meta: {
+      email: readContactEmail(p.type, attrs),
+      phone: (attrs[PERSON_ATTR.phone] as string | undefined) ?? undefined,
+    },
+  };
 }

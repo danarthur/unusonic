@@ -496,6 +496,8 @@ export type Database = {
           id: string
           linked_deal_id: string | null
           linked_event_id: string | null
+          note_scope: string | null
+          note_scope_pinned: boolean
           parsed_entity: Json | null
           parsed_follow_up: Json | null
           parsed_note: string | null
@@ -515,6 +517,8 @@ export type Database = {
           id?: string
           linked_deal_id?: string | null
           linked_event_id?: string | null
+          note_scope?: string | null
+          note_scope_pinned?: boolean
           parsed_entity?: Json | null
           parsed_follow_up?: Json | null
           parsed_note?: string | null
@@ -534,6 +538,8 @@ export type Database = {
           id?: string
           linked_deal_id?: string | null
           linked_event_id?: string | null
+          note_scope?: string | null
+          note_scope_pinned?: boolean
           parsed_entity?: Json | null
           parsed_follow_up?: Json | null
           parsed_note?: string | null
@@ -1229,6 +1235,10 @@ export type Database = {
         Args: { p_lock?: boolean; p_session_id: string; p_title: string }
         Returns: undefined
       }
+      set_capture_note_scope: {
+        Args: { p_capture_id: string; p_note_scope: string }
+        Returns: boolean
+      }
       submit_pill_feedback: {
         Args: { p_feedback: string; p_line_id: string }
         Returns: boolean
@@ -1305,6 +1315,7 @@ export type Database = {
           p_created_follow_up_queue_id?: string
           p_linked_deal_id?: string
           p_linked_event_id?: string
+          p_note_scope?: string
           p_parsed_entity?: Json
           p_parsed_follow_up?: Json
           p_parsed_note?: string
@@ -1444,6 +1455,7 @@ export type Database = {
           dnr_reason: string | null
           entity_id: string
           preferred_channel: string | null
+          private_notes: string | null
           updated_at: string
           updated_by: string | null
           workspace_id: string
@@ -1456,6 +1468,7 @@ export type Database = {
           dnr_reason?: string | null
           entity_id: string
           preferred_channel?: string | null
+          private_notes?: string | null
           updated_at?: string
           updated_by?: string | null
           workspace_id: string
@@ -1468,6 +1481,7 @@ export type Database = {
           dnr_reason?: string | null
           entity_id?: string
           preferred_channel?: string | null
+          private_notes?: string | null
           updated_at?: string
           updated_by?: string | null
           workspace_id?: string
@@ -1496,6 +1510,7 @@ export type Database = {
           p_dnr_reason?: string
           p_entity_id: string
           p_preferred_channel?: string
+          p_private_notes?: string
           p_source?: string
           p_workspace_id: string
         }
@@ -6086,6 +6101,7 @@ export type Database = {
         Args: { p_label: string }
         Returns: string
       }
+      normalize_role_label: { Args: { p_input: string }; Returns: string }
       patch_event_ros_data: {
         Args: { p_event_id: string; p_patch: Json }
         Returns: undefined
@@ -7105,6 +7121,7 @@ export type Database = {
           onboarding_persona_completed: boolean | null
           onboarding_step: number | null
           onboarding_summary: string | null
+          passkey_nudge_dismissed_at: string | null
           persona: Database["public"]["Enums"]["user_persona"] | null
           recovery_setup_at: string | null
           updated_at: string | null
@@ -7122,6 +7139,7 @@ export type Database = {
           onboarding_persona_completed?: boolean | null
           onboarding_step?: number | null
           onboarding_summary?: string | null
+          passkey_nudge_dismissed_at?: string | null
           persona?: Database["public"]["Enums"]["user_persona"] | null
           recovery_setup_at?: string | null
           updated_at?: string | null
@@ -7139,6 +7157,7 @@ export type Database = {
           onboarding_persona_completed?: boolean | null
           onboarding_step?: number | null
           onboarding_summary?: string | null
+          passkey_nudge_dismissed_at?: string | null
           persona?: Database["public"]["Enums"]["user_persona"] | null
           recovery_setup_at?: string | null
           updated_at?: string | null
@@ -8011,15 +8030,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_books_for_edge: {
-        Args: {
-          p_company_id: string
-          p_person_id: string
-          p_since?: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
       add_catalog_item_assignee: {
         Args: {
           p_entity_id: string
@@ -8075,16 +8085,6 @@ export type Database = {
           p_last_name: string
           p_org_id: string
           p_role: string
-          p_workspace_id: string
-        }
-        Returns: Json
-      }
-      add_represents_edge: {
-        Args: {
-          p_principal_id: string
-          p_representative_id: string
-          p_scope?: string
-          p_since?: string
           p_workspace_id: string
         }
         Returns: Json
@@ -8335,6 +8335,21 @@ export type Database = {
         Args: { p_location_name?: string; p_workspace_id: string }
         Returns: string
       }
+      create_workspace_with_owner: {
+        Args: {
+          p_modules_enabled?: string[]
+          p_name: string
+          p_organization_type: string
+          p_owner_display_name: string
+          p_owner_email: string
+          p_persona: string
+          p_pms_integration_enabled?: boolean
+          p_signalpay_enabled?: boolean
+          p_slug: string
+          p_subscription_tier: string
+        }
+        Returns: Json
+      }
       current_entity_id: { Args: never; Returns: string }
       deal_in_workspace: { Args: { p_deal_id: string }; Returns: boolean }
       generate_bridge_pairing_code: {
@@ -8374,10 +8389,6 @@ export type Database = {
         Returns: Json
       }
       get_ghost_entity_by_email: { Args: { p_email: string }; Returns: string }
-      get_member_permissions: {
-        Args: { p_user_id?: string; p_workspace_id: string }
-        Returns: Json
-      }
       get_member_role_slug: {
         Args: { p_workspace_id: string }
         Returns: string
@@ -8436,10 +8447,6 @@ export type Database = {
         Args: { p_permission_key: string; p_workspace_id: string }
         Returns: boolean
       }
-      member_has_permission: {
-        Args: { p_permission_key: string; p_workspace_id: string }
-        Returns: boolean
-      }
       merge_industry_tags: {
         Args: { p_from_tag: string; p_to_tag: string; p_workspace_id: string }
         Returns: undefined
@@ -8482,10 +8489,6 @@ export type Database = {
         Returns: boolean
       }
       purge_expired_sms_otp_codes: { Args: never; Returns: undefined }
-      regenerate_invite_code: {
-        Args: { p_workspace_id: string }
-        Returns: string
-      }
       remove_catalog_item_assignee: {
         Args: { p_assignee_id: string }
         Returns: undefined
@@ -8534,6 +8537,20 @@ export type Database = {
         Args: { p_prev_proposal_id: string; p_revision_note?: string }
         Returns: string
       }
+      set_co_host_status: {
+        Args: {
+          p_ended_on?: string
+          p_partner_a_id: string
+          p_partner_b_id: string
+          p_status: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      set_workspace_label_pack: {
+        Args: { p_pack: string; p_workspace_id: string }
+        Returns: Json
+      }
       strip_industry_tag: {
         Args: { p_tag: string; p_workspace_id: string }
         Returns: undefined
@@ -8572,10 +8589,6 @@ export type Database = {
         Returns: boolean
       }
       workspace_created_by_me: {
-        Args: { p_workspace_id: string }
-        Returns: boolean
-      }
-      workspace_joinable_by_invite: {
         Args: { p_workspace_id: string }
         Returns: boolean
       }

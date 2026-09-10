@@ -22,12 +22,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MoreHorizontal,
   Lock,
-  Users,
-  Pencil,
-  Link2,
-  Trash2,
   FileText,
   X,
   Search,
@@ -44,7 +39,9 @@ import { STAGE_LIGHT } from '@/shared/lib/motion-constants';
 import { queryKeys } from '@/shared/api/query-keys';
 import { withFrom } from '@/shared/lib/smart-back';
 import { useCurrentHref } from '@/shared/lib/smart-back-client';
-import { Popover, PopoverTrigger, PopoverContent } from '@/shared/ui/popover';
+import { CaptureRowMenu } from './CaptureRowMenu';
+import { partitionByScope } from './capture-note-scope';
+import { CaptureShowNotes } from './CaptureShowNotes';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +54,7 @@ import {
   searchReassignTargets,
   type ReassignTarget,
 } from '../api/search-reassign-targets';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface CaptureTimelinePanelProps {
   workspaceId: string;
@@ -69,6 +67,15 @@ export interface CaptureTimelinePanelProps {
    * entity studio. Leave false for person / couple entities.
    */
   entityType?: 'person' | 'company' | 'venue' | 'couple' | null;
+  /**
+   * When present, the free-text note for this relationship is composed at the
+   * bottom of this card instead of in a second card of its own. Two boxes both
+   * headed with some form of "notes", each with its own input, read as two
+   * different things to fill in when they are one activity.
+   *
+   * Absent on the full entity page, which has no single relationship in view.
+   */
+  relationshipId?: string | null;
 }
 
 // Group-by-production threshold per design Decision B default: flat until
@@ -128,11 +135,15 @@ function groupCaptures(
   };
 }
 
+/** Module-level so an empty result is referentially stable across renders. */
+const EMPTY_CAPTURES: EntityCapture[] = [];
+
 export function CaptureTimelinePanel({
   workspaceId,
   entityId,
   entityName,
   entityType = null,
+  relationshipId = null,
 }: CaptureTimelinePanelProps) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -151,8 +162,7 @@ export function CaptureTimelinePanel({
     enabled: Boolean(workspaceId && entityId),
   });
 
-  const captures =
-    data && 'ok' in data && data.ok ? data.captures : [];
+  const captures = data && 'ok' in data && data.ok ? data.captures : EMPTY_CAPTURES;
 
   // Deep-link: ?capture={id} scrolls to that row and highlights briefly.
   // Also expand visibleCount if the target is past the first page.
@@ -174,25 +184,30 @@ export function CaptureTimelinePanel({
     };
   }, [targetCaptureId, captures, visibleCount]);
 
-  const visibleCaptures = captures.slice(0, visibleCount);
+  const { about, show } = React.useMemo(() => partitionByScope(captures), [captures]);
+  const visibleCaptures = about.slice(0, visibleCount);
   const { mode, groups } = React.useMemo(
     () => groupCaptures(visibleCaptures),
     [visibleCaptures],
   );
 
   const invalidate = React.useCallback(() => {
+    // Only the captures. The generated brief that also read this entity is
+    // gone, and nothing else changes when a note lands.
     queryClient.invalidateQueries({
       queryKey: queryKeys.entities.captures(workspaceId, entityId),
     });
-    queryClient.invalidateQueries({
-      queryKey: queryKeys.entities.summary(workspaceId, entityId),
-    });
   }, [queryClient, workspaceId, entityId]);
+
+  // With nothing captured AND nowhere to write, there is nothing to show. When
+  // a composer is available the card stays, because the input is the reason to
+  // open it -- it just does not also print an empty-state paragraph above.
+  if (!isLoading && captures.length === 0 && !relationshipId) return null;
 
   if (isLoading && captures.length === 0) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-24 rounded stage-skeleton" />
@@ -203,22 +218,24 @@ export function CaptureTimelinePanel({
 
   return (
     <div
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
         <h3 className="stage-label text-[var(--stage-text-secondary)]">Notes</h3>
-        {captures.length > 0 && (
+        {about.length > 0 && (
           <span className="text-[11px] text-[var(--stage-text-tertiary)] tabular-nums">
-            {captures.length}
+            {about.length}
           </span>
         )}
       </div>
 
-      {captures.length === 0 ? (
-        <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
-          No notes yet. Tap the composer on the lobby to leave one.
-        </p>
+      {about.length === 0 ? (
+        relationshipId ? null : (
+          <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-tertiary)]">
+            No notes yet. Tap the composer on the lobby to leave one.
+          </p>
+        )
       ) : mode === 'flat' ? (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
@@ -260,15 +277,44 @@ export function CaptureTimelinePanel({
         </div>
       )}
 
-      {captures.length > visibleCount && (
+      {about.length > visibleCount && (
         <button
           type="button"
           onClick={() => setVisibleCount((n) => n + 10)}
           className="text-[11px] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] transition-colors"
         >
-          Show older ({captures.length - visibleCount} more)
+          Show older ({about.length - visibleCount} more)
         </button>
       )}
+
+      <CaptureShowNotes
+        count={show.length}
+        defaultOpen={Boolean(targetCaptureId && show.some((c) => c.id === targetCaptureId))}
+      >
+        <AnimatePresence initial={false}>
+          {show.map((c) => (
+            <CaptureRow
+              key={c.id}
+              capture={c}
+              workspaceId={workspaceId}
+              entityName={entityName}
+              showProductionPill
+              highlighted={highlightedCaptureId === c.id}
+              onMutated={invalidate}
+            />
+          ))}
+        </AnimatePresence>
+      </CaptureShowNotes>
+
+      {/*
+        A notes composer used to sit here, writing `context_data.notes` on the
+        relationship edge. It is gone: "How to handle" above this panel now
+        holds private notes on the entity itself, and two boxes labelled Notes
+        on one page is one too many. The edge-scoped version was the worse of
+        the two anyway -- it rendered "Available for partners." whenever there
+        was no edge, which is most contacts, and a note you keep about somebody
+        should not depend on how you happen to be related to them.
+      */}
     </div>
   );
 }
@@ -493,193 +539,6 @@ function CaptureRow({
 
 // ── Row menu ─────────────────────────────────────────────────────────────────
 
-function CaptureRowMenu({
-  capture,
-  isOwn,
-  expanded,
-  onToggleTranscript,
-  onStartEdit,
-  onStartReassign,
-  onMutated,
-}: {
-  capture: EntityCapture;
-  isOwn: boolean;
-  expanded: boolean;
-  onToggleTranscript: () => void;
-  onStartEdit: () => void;
-  onStartReassign: () => void;
-  onMutated: () => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [pendingVisibilityConfirm, setPendingVisibilityConfirm] = React.useState(false);
-  const [pendingDelete, setPendingDelete] = React.useState(false);
-
-  const isPrivate = capture.visibility === 'user';
-
-  const handleVisibility = async () => {
-    const next = isPrivate ? 'workspace' : 'user';
-    // Confirm on user→workspace promotion only; workspace→user is always safe.
-    if (isPrivate && !pendingVisibilityConfirm) {
-      setPendingVisibilityConfirm(true);
-      return;
-    }
-    setPendingVisibilityConfirm(false);
-    const result = await updateCapture({
-      action: 'visibility',
-      captureId: capture.id,
-      visibility: next,
-    });
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success(next === 'workspace' ? 'Shared with team.' : 'Made private.');
-    setOpen(false);
-    onMutated();
-  };
-
-  const handleDelete = async () => {
-    if (!pendingDelete) {
-      setPendingDelete(true);
-      return;
-    }
-    setPendingDelete(false);
-    const result = await updateCapture({
-      action: 'delete',
-      captureId: capture.id,
-    });
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success('Deleted.');
-    setOpen(false);
-    onMutated();
-  };
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) {
-          setPendingVisibilityConfirm(false);
-          setPendingDelete(false);
-        }
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Capture actions"
-          className={cn(
-            'shrink-0 p-1 rounded-md',
-            'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-primary)]',
-            'hover:bg-[oklch(1_0_0/0.06)] transition-colors',
-            'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-          )}
-        >
-          <MoreHorizontal className="size-3.5" strokeWidth={1.5} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-56 p-1">
-        <MenuItem
-          icon={<FileText className="size-3.5" />}
-          label={expanded ? 'Hide transcript' : 'Show transcript'}
-          onClick={() => {
-            onToggleTranscript();
-            setOpen(false);
-          }}
-          disabled={!capture.transcript}
-        />
-        {isOwn && (
-          <>
-            <MenuItem
-              icon={<Pencil className="size-3.5" />}
-              label="Edit"
-              onClick={() => {
-                onStartEdit();
-                setOpen(false);
-              }}
-            />
-            <MenuItem
-              icon={<Link2 className="size-3.5" />}
-              label="Reassign"
-              onClick={() => {
-                onStartReassign();
-                setOpen(false);
-              }}
-            />
-            <MenuItem
-              icon={
-                isPrivate ? (
-                  <Users className="size-3.5" />
-                ) : (
-                  <Lock className="size-3.5" />
-                )
-              }
-              label={
-                pendingVisibilityConfirm
-                  ? 'Confirm share with team?'
-                  : isPrivate
-                    ? 'Share with team'
-                    : 'Make private'
-              }
-              onClick={handleVisibility}
-              variant={pendingVisibilityConfirm ? 'warning' : 'default'}
-            />
-            <MenuItem
-              icon={<Trash2 className="size-3.5" />}
-              label={pendingDelete ? 'Confirm delete?' : 'Delete'}
-              onClick={handleDelete}
-              variant={pendingDelete ? 'danger' : 'default'}
-            />
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function MenuItem({
-  icon,
-  label,
-  onClick,
-  disabled,
-  variant = 'default',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'warning' | 'danger';
-}) {
-  const colorClass =
-    variant === 'danger'
-      ? 'text-[var(--color-unusonic-error)]'
-      : variant === 'warning'
-        ? 'text-[var(--color-unusonic-warning)]'
-        : 'text-[var(--stage-text-primary)]';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        'w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-xs',
-        'hover:bg-[oklch(1_0_0/0.06)] transition-colors',
-        'disabled:opacity-40 disabled:cursor-not-allowed',
-        colorClass,
-      )}
-    >
-      <span className="text-[var(--stage-text-tertiary)]">{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-// ── Edit mode ────────────────────────────────────────────────────────────────
-
 function CaptureEditor({
   capture,
   onCancel,
@@ -703,7 +562,7 @@ function CaptureEditor({
     });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       return;
     }
     toast.success('Saved.');
@@ -810,7 +669,7 @@ function ReassignDialog({
     });
     setReassigning(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       return;
     }
     toast.success(`Moved to ${target.name}.`);
@@ -898,7 +757,7 @@ function ReassignDialog({
                 });
                 setReassigning(false);
                 if (!result.ok) {
-                  toast.error(result.error);
+                  toast.error(result.error, { duration: Infinity });
                   return;
                 }
                 toast.success('Un-assigned.');
@@ -927,16 +786,4 @@ function ReassignDialog({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 

@@ -473,13 +473,13 @@ export async function searchMemory(
     const { createClient } = await import('@/shared/api/supabase/server');
     const supabase = await createClient();
 
-    const { data, error } = await supabase.rpc('match_memory', {
+    const { data, error } = await supabase.schema('cortex').rpc('match_memory', {
       p_workspace_id: workspaceId,
       p_query_embedding: embeddingStr,
       p_match_count: options?.limit ?? 5,
       p_match_threshold: options?.threshold ?? 0.3,
-      p_source_types: options?.sourceTypes ?? null,
-      p_entity_ids: options?.entityIds ?? null,
+      p_source_types: options?.sourceTypes ?? undefined,
+      p_entity_ids: options?.entityIds ?? undefined,
     });
 
     if (error || !data) return [];

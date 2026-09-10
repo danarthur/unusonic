@@ -39,6 +39,13 @@ export type WorkingNotes = {
   dnrReason: WorkingNotesDnrReason | null;
   dnrNote: string | null;
   preferredChannel: WorkingNotesChannel | null;
+  /**
+   * Free text this workspace keeps about the contact, and never shows them.
+   *
+   * Never written by a capture -- the RPC refuses that -- so it carries no
+   * Aion mark and never appears in `autoFilledFields`.
+   */
+  privateNotes: string | null;
   updatedAt: string | null;
   updatedByName: string | null;
   /** Fields most recently populated by Aion from a capture — for rendering the mark. */
@@ -55,6 +62,7 @@ type RawRow = {
   dnr_reason: string | null;
   dnr_note: string | null;
   preferred_channel: string | null;
+  private_notes: string | null;
   updated_at: string | null;
   updated_by: string | null;
   auto_filled_fields: string[] | null;
@@ -66,6 +74,7 @@ const EMPTY: WorkingNotes = {
   dnrReason: null,
   dnrNote: null,
   preferredChannel: null,
+  privateNotes: null,
   updatedAt: null,
   updatedByName: null,
   autoFilledFields: [],
@@ -92,7 +101,7 @@ export async function getWorkingNotes(
     .schema('directory')
     .from('entity_working_notes')
     .select(
-      'communication_style, dnr_flagged, dnr_reason, dnr_note, preferred_channel, updated_at, updated_by, auto_filled_fields',
+      'communication_style, dnr_flagged, dnr_reason, dnr_note, preferred_channel, private_notes, updated_at, updated_by, auto_filled_fields',
     )
     .eq('workspace_id', workspaceId)
     .eq('entity_id', entityId)
@@ -125,6 +134,7 @@ export async function getWorkingNotes(
       dnrReason: (row.dnr_reason as WorkingNotesDnrReason | null) ?? null,
       dnrNote: row.dnr_note,
       preferredChannel: (row.preferred_channel as WorkingNotesChannel | null) ?? null,
+      privateNotes: row.private_notes,
       updatedAt: row.updated_at,
       updatedByName,
       autoFilledFields,

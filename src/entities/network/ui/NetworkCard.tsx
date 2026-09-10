@@ -1,74 +1,135 @@
 'use client';
 
+/**
+ * A contact card.
+ *
+ * Every card is the same shape: avatar, name, role, then three detail lines
+ * drawn from an ordered priority list in card-slots.ts. That uniformity is the
+ * point. The card previously had nine conditionally-rendered slots, so a
+ * partner with a balance, three tags, two capabilities, an employer and two
+ * affiliates stood roughly three times the height of a bare person card, and
+ * the grid looked broken even when every card was individually fine.
+ *
+ * Uniform silhouette matters because the mode this grid has to serve is
+ * shortlist building -- "who can work Saturday" -- which is comparison, and
+ * comparison needs the same field in the same physical position on every card.
+ * Recognition is search's job and search does it better.
+ *
+ * What is on each line, and why each cut field was cut, lives in card-slots.ts.
+ */
+
+import * as React from 'react';
+
 import { motion } from 'framer-motion';
-import { Building2, User, Star, MapPin } from 'lucide-react';
+import { Star, MapPin } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { crewCompleteness, type CrewCompletenessLevel } from '@/shared/lib/crew-profile';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { EntityAvatar } from './EntityAvatar';
+import { resolveCardSlots, isFlagged, CARD_SLOT_COUNT, type CardSlot } from '../model/card-slots';
 import type { NetworkNode } from '../model/types';
 
 interface NetworkCardProps {
   node: NetworkNode;
   onClick?: () => void;
+  /** Open one of the people named on a company card. */
+  onAffiliateClick?: (entityId: string) => void;
   onTogglePreferred?: (relationshipId: string) => void;
   className?: string;
   layoutId?: string;
+  /**
+   * Detail rows to reserve, so every card in a grid lines up.
+   *
+   * Defaults to the maximum. Callers rendering a grid should pass
+   * reservedSlotCount() for that grid instead, so a directory with little on
+   * file does not render as a wall of tall, half-empty cards.
+   */
+  slotCount?: number;
 }
 
-function formatSince(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+/** One detail line. Empty renders as reserved space so rows stay aligned. */
+function SlotRow({
+  slot,
+  onAffiliateClick,
+}: {
+  slot: CardSlot | undefined;
+  onAffiliateClick?: (entityId: string) => void;
+}) {
+  if (!slot) return <p className="stage-label truncate" aria-hidden>&nbsp;</p>;
+
+  const className = cn(
+    'truncate',
+    slot.numeric
+      ? 'font-[family-name:var(--stage-data-font)] text-[length:var(--stage-readout-sm-size)] tabular-nums'
+      : 'stage-label',
+    slot.tone === 'warning'
+      ? 'text-[var(--color-unusonic-warning)]'
+      : 'text-[var(--stage-text-secondary)]',
+  );
+
+  if (!slot.links) return <p className={className}>{slot.text}</p>;
+
+  return (
+    <p className={className}>
+      {slot.links.map((link, i) => (
+        <React.Fragment key={link.entityId}>
+          {i > 0 && ', '}
+          <button
+            type="button"
+            // The card itself is role="button"; without stopPropagation this
+            // would open the company instead of the person.
+            onClick={(e) => {
+              e.stopPropagation();
+              onAffiliateClick?.(link.entityId);
+            }}
+            className="underline decoration-[var(--stage-text-tertiary)] underline-offset-2 hover:text-[var(--stage-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] rounded-sm"
+          >
+            {link.name}
+          </button>
+        </React.Fragment>
+      ))}
+      {slot.suffix}
+    </p>
+  );
 }
 
-const COMPLETENESS_PILL_CLASS: Record<CrewCompletenessLevel, string | null> = {
-  incomplete: null,
-  core: 'text-[var(--stage-text-secondary)] stage-badge-text',
-  ready:
-    'text-[var(--color-unusonic-info)] bg-[var(--color-unusonic-info)]/10 border border-[var(--color-unusonic-info)]/20 rounded-full px-2 py-0.5 stage-badge-text',
-  compliant:
-    'text-[var(--color-unusonic-success)] bg-[var(--color-unusonic-success)]/10 border border-[var(--color-unusonic-success)]/20 rounded-full px-2 py-0.5 stage-badge-text',
-};
+/** This user's own pin. Personal and silent — colleagues do not see it. */
+function StarButton({ starred, onToggle }: { starred: boolean; onToggle: (e: React.MouseEvent) => void }) {
+  const label = starred ? 'Remove star' : 'Star for quick access';
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={cn(
+        'absolute top-2.5 right-2.5 z-10 rounded p-1 transition-colors duration-[80ms]',
+        starred
+          ? 'text-[var(--stage-text-primary)]'
+          : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--stage-text-primary)]/70',
+      )}
+      title={label}
+      aria-label={label}
+      aria-pressed={starred}
+    >
+      <Star size={14} strokeWidth={1.5} className={starred ? 'fill-[var(--stage-text-primary)]' : ''} />
+    </button>
+  );
+}
 
-const COMPLETENESS_LABEL: Record<CrewCompletenessLevel, string | null> = {
-  incomplete: null,
-  core: 'Core',
-  ready: 'Ready',
-  compliant: 'Compliant',
-};
-
-/** Core (employee): matte elevated. Partner: standard surface. Preferred (inner_circle): silk star marker. */
-export function NetworkCard({ node, onClick, onTogglePreferred, className, layoutId }: NetworkCardProps) {
-  // Freelancer persons (external_partner + person + inner_circle) render as
-  // crew, not partners. CLIENT-edge persons (wedding hosts, individual
-  // clients) are NOT freelancers — they must render in the Network/clients
-  // lane even though they're person-type entities.
-  const isFreelancerPerson =
-    node.kind === 'external_partner'
-    && node.identity.entityType === 'person'
-    && node.gravity === 'inner_circle'
-    && node.relationshipType !== 'CLIENT';
-  const isCore = node.gravity === 'core' || isFreelancerPerson;
-  const isPartner = node.kind === 'external_partner' && !isFreelancerPerson;
-  // Two different things that used to be one flag:
-  //   starred  — this user's personal pin (cortex.network_stars). Silent.
-  //   preferred — the workspace's shared tier judgement on the relationship.
+export function NetworkCard({
+  node,
+  onClick,
+  onAffiliateClick,
+  onTogglePreferred,
+  className,
+  layoutId,
+  slotCount = CARD_SLOT_COUNT,
+}: NetworkCardProps) {
+  const slots = React.useMemo(() => resolveCardSlots(node), [node]);
   const isStarred = node.starred === true;
+  // Two different things that used to be one flag:
+  //   starred   -- this user's personal pin. Silent, and nobody else sees it.
+  //   preferred -- the workspace's shared tier judgement on the relationship.
   const isPreferred = node.gravity === 'inner_circle';
-
-  // Completeness pill: only for person nodes (team members)
-  const completenessLevel =
-    node.identity.entityType === 'person'
-      ? crewCompleteness({
-          first_name: node.identity.name.split(' ')[0] || null,
-          phone: node.meta.phone ?? null,
-          job_title: node.identity.label,
-          skills: node.meta.tags,
-          market: node.meta.market ?? null,
-          union_status: node.meta.union_status ?? null,
-          w9_status: node.meta.w9_status ?? null,
-          coi_expiry: node.meta.coi_expiry ?? null,
-        })
-      : null;
+  const flagged = isFlagged(node);
 
   const handleToggleStar = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -83,183 +144,6 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
     }
   };
 
-  const content = (
-    <>
-      {/* Star — this user's own pin. Available on every card, not just
-          partners: anyone can be someone you look at a lot. */}
-      {onTogglePreferred && (
-        <button
-          type="button"
-          onClick={handleToggleStar}
-          className={`absolute top-2.5 left-2.5 z-10 rounded p-1 transition-colors duration-[80ms] ${
-            isStarred
-              ? 'text-[var(--stage-text-primary)]'
-              : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--stage-text-primary)]/70'
-          }`}
-          title={isStarred ? 'Remove star' : 'Star for quick access'}
-          aria-label={isStarred ? 'Remove star' : 'Star for quick access'}
-          aria-pressed={isStarred}
-        >
-          <Star
-            size={14}
-            strokeWidth={1.5}
-            className={isStarred ? 'fill-[var(--stage-text-primary)]' : ''}
-          />
-        </button>
-      )}
-
-      {/* Preferred — the workspace's shared judgement, shown as a quiet badge
-          rather than a control. Changing it is a deliberate act elsewhere. */}
-      {isPartner && isPreferred && (
-        <span
-          className="absolute top-2.5 right-2.5 z-10 rounded-[var(--stage-radius-input,6px)] border border-[var(--stage-edge-subtle)] bg-[oklch(1_0_0_/_0.06)] px-1.5 py-px stage-badge-text text-[var(--stage-text-secondary)]"
-          title="Preferred — a shared workspace judgement"
-        >
-          Preferred
-        </span>
-      )}
-      {isCore && node.meta.doNotRebook && (
-        <span
-          className="absolute top-3 right-3 size-2 rounded-full bg-[var(--color-unusonic-warning)]"
-          aria-label="Do not rebook"
-        />
-      )}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <motion.div
-            layoutId={layoutId ? `${layoutId}-avatar` : undefined}
-            className={cn(
-              'flex shrink-0 items-center justify-center overflow-hidden bg-[var(--stage-surface-nested)] mt-0.5',
-              'size-10',
-              node.identity.entityType === 'person' || node.identity.entityType === 'couple'
-                ? 'rounded-full'
-                : 'rounded-[var(--stage-radius-nested)]',
-            )}
-          >
-            {node.identity.avatarUrl ? (
-              <img
-                src={node.identity.avatarUrl}
-                alt=""
-                className="size-full object-cover"
-              />
-            ) : isPartner && node.identity.entityType === 'venue' ? (
-              <MapPin className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-            ) : isPartner && node.identity.entityType !== 'person' && node.identity.entityType !== 'couple' ? (
-              <Building2 className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-            ) : (
-              <User className="size-5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
-            )}
-          </motion.div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium tracking-tight text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
-              {node.identity.name}
-            </p>
-            {isPartner ? (
-              node.meta.email ? (
-                <p className="truncate stage-label text-[var(--stage-text-secondary)]">{node.meta.email}</p>
-              ) : null
-            ) : (
-              <p className="stage-label text-[var(--stage-text-secondary)]">
-                {node.identity.label}
-                {node.kind === 'extended_team' && (
-                  <span className="ml-1.5 stage-badge-text text-[var(--stage-text-secondary)]">· 1099</span>
-                )}
-              </p>
-            )}
-            {(() => {
-              // For crew nodes, filter out skills that duplicate the title label
-              const tags = node.meta.tags ?? [];
-              const label = node.identity.label?.toLowerCase() ?? '';
-              const filtered = isCore
-                ? tags.filter((t) => t.toLowerCase() !== label)
-                : tags;
-              return filtered.length > 0 ? (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {filtered.slice(0, 3).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded bg-[var(--stage-text-primary)]/10 px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-secondary)]"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              ) : null;
-            })()}
-            {/* Business function badges */}
-            {(node.meta.capabilities ?? []).length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {node.meta.capabilities!.slice(0, 2).map((cap) => (
-                  <span
-                    key={cap}
-                    className="rounded bg-[var(--stage-text-primary)]/10 px-1.5 py-0.5 stage-badge-text text-[var(--stage-text-secondary)]"
-                  >
-                    {cap}
-                  </span>
-                ))}
-              </div>
-            )}
-            {completenessLevel && completenessLevel !== 'incomplete' && (
-              <div className="mt-1">
-                <span className={cn(COMPLETENESS_PILL_CLASS[completenessLevel])}>
-                  {COMPLETENESS_LABEL[completenessLevel]}
-                </span>
-              </div>
-            )}
-            {isPartner && (node.meta.outstanding_balance ?? 0) > 0 && (
-              <p className="mt-1.5 font-[family-name:var(--stage-data-font)] text-[length:var(--stage-readout-sm-size)] tabular-nums text-[var(--color-unusonic-warning)]">
-                ${(node.meta.outstanding_balance!).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} outstanding
-              </p>
-            )}
-            {/*
-              Employer line on a person. Without it, a planner and the agency
-              they work for sit as two unrelated cards with nothing connecting
-              them -- which is how the same relationship read as two strangers.
-            */}
-            {node.employer && (
-              <p className="mt-1 truncate stage-label text-[var(--stage-text-secondary)]">
-                {node.employer.name}
-              </p>
-            )}
-            {/*
-              People at this company. Many have no direct edge to the workspace,
-              so this row is the only place they surface on the contacts page at
-              all. Two names then a count -- the card is a glance, not a roster.
-            */}
-            {node.affiliates && node.affiliates.length > 0 && (
-              <p className="mt-1 truncate stage-label text-[var(--stage-text-secondary)]">
-                {node.affiliates.slice(0, 2).map((a) => a.name).join(', ')}
-                {node.affiliates.length > 2 && ` +${node.affiliates.length - 2}`}
-              </p>
-            )}
-            {(node.meta.referral_count ?? 0) > 0 && (
-              <p className="mt-1 font-[family-name:var(--stage-data-font)] text-[length:var(--stage-readout-sm-size)] tabular-nums text-[var(--stage-text-secondary)]">
-                {node.meta.referral_count} referral{node.meta.referral_count! > 1 ? 's' : ''}
-              </p>
-            )}
-            {!(node.meta.outstanding_balance ?? 0) && !(node.meta.referral_count ?? 0) && node.meta.connectedSince && (
-              <p className="mt-1 stage-label text-[var(--stage-text-secondary)] tabular-nums">
-                since {formatSince(node.meta.connectedSince)}
-              </p>
-            )}
-          </div>
-        </div>
-        <span
-          className={cn(
-            'shrink-0 rounded-full px-2 py-0.5 stage-badge-text',
-            isPartner
-              ? 'bg-[var(--stage-text-primary)]/10 text-[var(--stage-text-secondary)]'
-              : 'bg-[var(--stage-text-primary)]/10 text-[var(--stage-text-secondary)]'
-          )}
-        >
-          {isPartner ? (node.identity.label || 'Partner') : isFreelancerPerson ? 'Freelancer' : 'Team'}
-        </span>
-      </div>
-    </>
-  );
-
-  const isArchived = isCore && node.meta.archived;
-
   return (
     <motion.div
       role="button"
@@ -271,13 +155,61 @@ export function NetworkCard({ node, onClick, onTogglePreferred, className, layou
       className={cn(
         'group stage-panel-interactive relative flex h-full w-full flex-col rounded-[var(--stage-radius-panel)] p-4 sm:p-5 text-left cursor-pointer',
         'text-[var(--stage-text-primary)]',
-        isArchived && 'opacity-40',
+        node.meta.archived && 'opacity-40',
+        // Preferred used to cost a corner and 60px of width to print a word.
+        // Brightness is the accent here, so a slightly lifted edge carries it
+        // instead, and the name it goes by is left to assistive tech.
+        isPreferred && 'ring-1 ring-inset ring-[oklch(1_0_0_/_0.10)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--stage-void)]',
-        className
+        className,
       )}
       transition={STAGE_MEDIUM}
     >
-      {content}
+      {onTogglePreferred && <StarButton starred={isStarred} onToggle={handleToggleStar} />}
+
+      <div className="flex min-w-0 items-start gap-3">
+        <EntityAvatar
+          name={node.identity.name}
+          avatarUrl={node.identity.avatarUrl}
+          entityType={node.identity.entityType}
+        />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium tracking-tight text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">
+            {node.identity.name}
+            {isPreferred && <span className="sr-only"> — Preferred</span>}
+          </p>
+
+          {/* Role, once. It used to render in the subtitle AND in a right-hand
+              chip, which read as the card repeating itself. */}
+          <p className="flex items-center gap-1.5 truncate stage-label text-[var(--stage-text-secondary)]">
+            {node.identity.entityType === 'venue' && (
+              <MapPin className="size-3 shrink-0" strokeWidth={1.5} aria-hidden />
+            )}
+            {node.identity.label}
+          </p>
+
+          {/* Fixed rows so a sparse entity does not collapse the layout and
+              knock every card beside it out of alignment. The count is the
+              grid's, not this card's, so nobody reserves space for data that
+              nothing in view actually has. */}
+          <div className={cn('flex flex-col gap-0.5', slotCount > 0 && 'mt-2')}>
+            {Array.from({ length: slotCount }, (_, i) => (
+              <SlotRow key={slots[i]?.key ?? `empty-${i}`} slot={slots[i]} onAffiliateClick={onAffiliateClick} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Do not rebook. Shown for every relationship, not only employees: on a
+          vendor or a venue this is the more consequential judgement, and the
+          one most likely to be missed by whoever books them next. */}
+      {flagged && (
+        <p className="mt-3 flex items-center gap-1.5 stage-badge-text text-[var(--color-unusonic-warning)]">
+          <span className="size-1.5 shrink-0 rounded-full bg-[var(--color-unusonic-warning)]" aria-hidden />
+          Do not rebook
+        </p>
+      )}
     </motion.div>
   );
 }

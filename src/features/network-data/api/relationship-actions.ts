@@ -9,6 +9,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getCurrentEntityAndOrg, orgTypeToCortex } from './network-helpers';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 // ---------------------------------------------------------------------------
 // Relationship tier
@@ -147,7 +148,7 @@ export async function updateRelationshipMeta(
 
   if (cortexRel) {
     const existingCtx = (cortexRel.context_data as Record<string, unknown>) ?? {};
-    const ctxPatch: Record<string, unknown> = { ...existingCtx };
+    const ctxPatch: JsonObject = { ...(existingCtx as JsonObject) };
     if (payload.tier !== undefined) ctxPatch.tier = payload.tier ?? 'standard';
     if (payload.tags !== undefined) ctxPatch.tags = payload.tags ?? null;
     if (payload.lifecycleStatus !== undefined) ctxPatch.lifecycle_status = payload.lifecycleStatus;
@@ -231,7 +232,7 @@ export async function restoreGhostRelationship(
     .maybeSingle();
 
   if (cortexRel) {
-    const existingCtx = (cortexRel.context_data as Record<string, unknown>) ?? {};
+    const existingCtx = (cortexRel.context_data as JsonObject) ?? {};
     const { deleted_at: _removed, ...rest } = existingCtx;
     const { error: rpcErr } = await supabase.rpc('upsert_relationship', {
       p_source_entity_id: cortexRel.source_entity_id,

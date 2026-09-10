@@ -12,6 +12,7 @@ import {
   type DnsRecord,
 } from '@/shared/api/resend/domains';
 import { requireAdminOrOwner } from './auth-helpers';
+import { writeLanded } from '@/shared/lib/write-landed';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -94,20 +95,26 @@ export async function addSendingDomain(
   const result = await addResendDomain(cleanDomain);
   if (!result.ok) return result;
 
-  // Persist to workspace
-  const { error: updateErr } = await supabase
-    .from('workspaces')
-    .update({
-      sending_domain: cleanDomain,
-      resend_domain_id: result.id,
-      sending_domain_status: 'pending',
-      sending_from_name: fromName.trim() || null,
-      sending_from_localpart: fromLocalpart.trim() || 'hello',
-    })
-    .eq('id', workspaceId);
+  // Persist to workspace. The domain now exists at Resend, so a write that
+  // does not land here leaves the two sides disagreeing -- worth saying out
+  // loud rather than returning the DNS records for a domain we did not record.
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update({
+        sending_domain: cleanDomain,
+        resend_domain_id: result.id,
+        sending_domain_status: 'pending',
+        sending_from_name: fromName.trim() || null,
+        sending_from_localpart: fromLocalpart.trim() || 'hello',
+      })
+      .eq('id', workspaceId)
+      .select('id'),
+    'the sending domain',
+  );
 
-  if (updateErr) {
-    return { ok: false, error: updateErr.message };
+  if (!landed.ok) {
+    return { ok: false, error: landed.error };
   }
 
   revalidatePath('/settings/email');
@@ -158,10 +165,15 @@ export async function verifySendingDomain(): Promise<VerifySendingDomainResult> 
     }
   }
 
-  await supabase
-    .from('workspaces')
-    .update({ sending_domain_status: status, dmarc_status: dmarcStatus })
-    .eq('id', workspaceId);
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update({ sending_domain_status: status, dmarc_status: dmarcStatus })
+      .eq('id', workspaceId)
+      .select('id'),
+    'the domain status',
+  );
+  if (!landed.ok) return { ok: false, error: landed.error };
 
   revalidatePath('/settings/email');
   return {
@@ -534,18 +546,26 @@ export async function removeSendingDomain(): Promise<RemoveSendingDomainResult> 
 
   const resendDomainId = ws?.resend_domain_id ?? null;
 
-  // Null workspace columns first — workspace is safe even if Resend call fails
-  await supabase
-    .from('workspaces')
-    .update({
-      sending_domain: null,
-      resend_domain_id: null,
-      sending_domain_status: null,
-      sending_from_name: null,
-      sending_from_localpart: null,
-      dmarc_status: null,
-    })
-    .eq('id', workspaceId);
+  // Null the workspace columns first, and stop if that did not happen. The
+  // order is what makes this matter: deleting the domain at Resend while the
+  // workspace still names it as its sender is how every outbound email from
+  // this workspace starts failing.
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update({
+        sending_domain: null,
+        resend_domain_id: null,
+        sending_domain_status: null,
+        sending_from_name: null,
+        sending_from_localpart: null,
+        dmarc_status: null,
+      })
+      .eq('id', workspaceId)
+      .select('id'),
+    'the sending domain',
+  );
+  if (!landed.ok) return { ok: false, error: landed.error };
 
   // Best-effort Resend cleanup — non-fatal if 404
   if (resendDomainId) {

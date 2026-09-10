@@ -15,6 +15,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { getSystemClient } from '@/shared/api/supabase/system';
+import { callRecordPaymentRpc } from './record-payment-internal';
 
 // =============================================================================
 // Generate invoices from accepted proposal
@@ -51,7 +52,6 @@ export async function spawnInvoicesFromProposal(
 
   // Call the RPC via system client (service role — required for SECURITY DEFINER)
   const system = getSystemClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types; PR-INFRA-2 fixes this
   const { data, error } = await system
     .schema('finance')
     .rpc('spawn_invoices_from_proposal', { p_proposal_id: proposalId });
@@ -136,7 +136,6 @@ export async function recordManualPayment(
   const sessionClient = await createClient();
 
   // Verify caller has workspace access to this invoice
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
   const { data: invoice, error: authErr } = await sessionClient
     .schema('finance')
     .from('invoices')
@@ -154,48 +153,17 @@ export async function recordManualPayment(
   return callRecordPaymentRpc(input, user?.id ?? null, eventId);
 }
 
-/**
- * Payment recording without session auth — for use by webhook handlers
- * that have already verified the Stripe signature.
- */
-export async function recordPaymentFromWebhook(
-  input: RecordPaymentInput,
-): Promise<RecordPaymentResult> {
-  return callRecordPaymentRpc(input, null);
-}
+/*
+  recordPaymentFromWebhook and callRecordPaymentRpc moved to
+  ./record-payment-internal.ts.
 
-async function callRecordPaymentRpc(
-  input: RecordPaymentInput,
-  userId: string | null,
-  eventId?: string,
-): Promise<RecordPaymentResult> {
-  const system = getSystemClient();
+  This file carries 'use server', so every export from it is a Server Action --
+  reachable by anyone who can POST to the app, not only by code that imports it.
+  `recordPaymentFromWebhook` took an invoice id and an amount, skipped session
+  auth by design, and wrote through the service-role client. As an export of
+  this module it was an unauthenticated "mark any invoice paid" endpoint.
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- finance schema not yet in PostgREST types
-  const { data: paymentId, error } = await system
-    .schema('finance')
-    .rpc('record_payment', {
-      p_invoice_id: input.invoiceId,
-      p_amount: input.amount,
-      p_method: input.method,
-      p_received_at: input.receivedAt ?? new Date().toISOString(),
-      p_reference: input.reference ?? undefined,
-      p_notes: input.notes ?? undefined,
-      p_stripe_payment_intent_id: input.stripePaymentIntentId ?? undefined,
-      p_stripe_charge_id: input.stripeChargeId ?? undefined,
-      p_status: input.status ?? 'succeeded',
-      p_recorded_by_user_id: userId ?? undefined,
-      p_parent_payment_id: input.parentPaymentId ?? undefined,
-      p_attachment_storage_path: input.attachmentStoragePath ?? undefined,
-    });
-
-  if (error) {
-    return { paymentId: null, error: error.message };
-  }
-
-  if (eventId) revalidatePath(`/events/${eventId}/finance`);
-  revalidatePath('/events');
-  revalidatePath('/finance');
-
-  return { paymentId: paymentId as string, error: null };
-}
+  It has one legitimate caller, the Stripe webhook route, which verifies the
+  signature before calling it. A route handler can import a plain server-only
+  module directly; it does not need a Server Action.
+*/

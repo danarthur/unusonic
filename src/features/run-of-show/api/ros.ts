@@ -10,6 +10,36 @@ import type { Cue, CueType, RosTemplate, Section, TemplateCueDef, TemplateSectio
 // Cues
 // ---------------------------------------------------------------------------
 
+/** A row as `run_of_show_cues` actually stores it: the two crew/gear lists are JSONB. */
+type CueRow = Omit<Cue, 'assigned_crew' | 'assigned_gear'> & {
+  assigned_crew: Json;
+  assigned_gear: Json;
+};
+
+/**
+ * A stored row, as a Cue.
+ *
+ * `assigned_crew` and `assigned_gear` are JSONB columns, so what comes back is
+ * `Json` -- which is to say, anything. The rows were being handed straight to
+ * callers as `Cue`, which asserted they were arrays of a particular shape
+ * without ever looking. A row written by an older version of this code, or by
+ * hand, or by a migration, would reach the run-of-show grid as an array it is
+ * not, and the failure would land in a render rather than here.
+ *
+ * Non-arrays become empty lists, which is what an unassigned cue is anyway.
+ */
+function toCue(row: CueRow): Cue {
+  return {
+    ...row,
+    assigned_crew: Array.isArray(row.assigned_crew)
+      ? (row.assigned_crew as unknown as Cue['assigned_crew'])
+      : [],
+    assigned_gear: Array.isArray(row.assigned_gear)
+      ? (row.assigned_gear as unknown as Cue['assigned_gear'])
+      : [],
+  };
+}
+
 export async function fetchCues(eventId: string): Promise<Cue[]> {
   const supabase = await createClient();
 
@@ -20,7 +50,7 @@ export async function fetchCues(eventId: string): Promise<Cue[]> {
     .order('sort_order', { ascending: true });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []).map(toCue);
 }
 
 export async function updateCueOrder(items: Cue[]): Promise<void> {
@@ -76,15 +106,29 @@ export async function createCue(eventId: string, cue: Partial<Cue>): Promise<Cue
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return toCue(data);
 }
 
 export async function updateCue(eventId: string, cueId: string, updates: Partial<Cue>): Promise<Cue> {
   const supabase = await createClient();
 
+  /*
+    The two list fields go back out as JSONB. `created_at` and `updated_at` are
+    dropped: they are the database's to set, and `Cue` types them as nullable,
+    so a caller spreading a whole cue back in would try to write null over them.
+  */
+  const { assigned_crew, assigned_gear, created_at: _created, updated_at: _updated, ...rest } = updates;
+  void _created;
+  void _updated;
+  const payload = {
+    ...rest,
+    ...(assigned_crew !== undefined ? { assigned_crew: assigned_crew as unknown as Json } : {}),
+    ...(assigned_gear !== undefined ? { assigned_gear: assigned_gear as unknown as Json } : {}),
+  };
+
   const { data, error } = await supabase
     .from('run_of_show_cues')
-    .update(updates)
+    .update(payload)
     .eq('id', cueId)
     .eq('event_id', eventId)
     .select('*')
@@ -93,7 +137,7 @@ export async function updateCue(eventId: string, cueId: string, updates: Partial
   if (error) throw new Error(error.message);
 
   revalidatePath(`/events/${eventId}/run-of-show`);
-  return data;
+  return toCue(data);
 }
 
 export async function deleteCue(eventId: string, cueId: string): Promise<Cue[]> {
@@ -116,7 +160,7 @@ export async function deleteCue(eventId: string, cueId: string): Promise<Cue[]> 
   if (fetchError) throw new Error(fetchError.message);
 
   revalidatePath(`/events/${eventId}/run-of-show`);
-  return data ?? [];
+  return (data ?? []).map(toCue);
 }
 
 export async function duplicateCue(
@@ -134,7 +178,8 @@ export async function duplicateCue(
 
   if (cueError || !cue) throw new Error(cueError?.message ?? 'Cue not found');
 
-  const nextOrder = cue.sort_order + 1;
+  const source = toCue(cue);
+  const nextOrder = source.sort_order + 1;
 
   const { data: shifted, error: shiftFetchError } = await supabase
     .from('run_of_show_cues')
@@ -160,16 +205,16 @@ export async function duplicateCue(
     .from('run_of_show_cues')
     .insert({
       event_id: eventId,
-      title: `${cue.title} Copy`,
-      start_time: cue.start_time,
-      duration_minutes: cue.duration_minutes,
-      type: cue.type,
-      notes: cue.notes,
+      title: `${source.title} Copy`,
+      start_time: source.start_time,
+      duration_minutes: source.duration_minutes,
+      type: source.type,
+      notes: source.notes,
       sort_order: nextOrder,
-      is_pre_show: (cue as Cue).is_pre_show ?? false,
-      assigned_crew: ((cue as Cue).assigned_crew ?? []) as unknown as Json,
-      assigned_gear: ((cue as Cue).assigned_gear ?? []) as unknown as Json,
-      section_id: (cue as Cue).section_id ?? null,
+      is_pre_show: source.is_pre_show ?? false,
+      assigned_crew: source.assigned_crew as unknown as Json,
+      assigned_gear: source.assigned_gear as unknown as Json,
+      section_id: source.section_id ?? null,
     })
     .select('*')
     .single();
@@ -185,7 +230,7 @@ export async function duplicateCue(
   if (fetchError) throw new Error(fetchError.message);
 
   revalidatePath(`/events/${eventId}/run-of-show`);
-  return { cues: data ?? [], newCueId: newCue.id };
+  return { cues: (data ?? []).map(toCue), newCueId: newCue.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +340,30 @@ export async function updateSectionOrder(sections: Section[]): Promise<void> {
 // RoS Templates
 // ---------------------------------------------------------------------------
 
+/** A stored template row. Sections ride inside the `cues` JSONB, not a column. */
+type RosTemplateRow = Omit<RosTemplate, 'cues' | 'sections'> & { cues: Json };
+
+/**
+ * A stored template row, as a RosTemplate.
+ *
+ * Old templates hold `cues` as a plain array; newer ones wrap both lists as
+ * `{ __cues, __sections }`, because `ops.workspace_ros_templates` has no
+ * sections column. Anything matching neither shape becomes an empty cue list
+ * rather than being handed to the picker as an array it is not -- and says so,
+ * so a legacy snapshot can be re-imported rather than quietly lost.
+ */
+function toRosTemplate(row: RosTemplateRow): RosTemplate {
+  const raw = row.cues as unknown;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && '__cues' in (raw as Record<string, unknown>)) {
+    const wrapped = raw as { __cues: TemplateCueDef[]; __sections: TemplateSectionDef[] };
+    return { ...row, cues: wrapped.__cues ?? [], sections: wrapped.__sections ?? [] };
+  }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    console.warn('[ros] template shape not recognised', { templateId: row.id });
+  }
+  return { ...row, cues: Array.isArray(raw) ? (raw as TemplateCueDef[]) : [], sections: [] };
+}
+
 export async function fetchRosTemplates(): Promise<RosTemplate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -304,22 +373,7 @@ export async function fetchRosTemplates(): Promise<RosTemplate[]> {
     .order('name', { ascending: true });
 
   if (error) throw new Error(error.message);
-
-  // Normalize: old templates have cues as plain array, new ones use { __cues, __sections } wrapper.
-  // Anything else (legacy snapshots that don't match either shape) is dropped to
-  // an empty cue list rather than letting an unparseable shape silently lose
-  // data inside the picker. Sentry surfaces the legacy hit so we can re-import.
-  return (data ?? []).map((row) => {
-    const raw = row.cues as unknown;
-    if (raw && typeof raw === 'object' && !Array.isArray(raw) && '__cues' in (raw as Record<string, unknown>)) {
-      const wrapped = raw as { __cues: TemplateCueDef[]; __sections: TemplateSectionDef[] };
-      return { ...row, cues: wrapped.__cues, sections: wrapped.__sections } as unknown as RosTemplate;
-    }
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      console.warn('[ros] fetchRosTemplates: legacy template shape detected', { templateId: row.id });
-    }
-    return { ...row, cues: (raw ?? []) as TemplateCueDef[], sections: [] } as unknown as RosTemplate;
-  });
+  return (data ?? []).map(toRosTemplate);
 }
 
 export async function saveRosTemplate(
@@ -373,7 +427,7 @@ export async function saveRosTemplate(
     .single();
 
   if (error) throw new Error(error.message);
-  return data as RosTemplate;
+  return toRosTemplate(data);
 }
 
 export async function deleteRosTemplate(templateId: string): Promise<void> {

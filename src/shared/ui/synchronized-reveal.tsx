@@ -86,7 +86,7 @@ const DefaultPrimaryFallback = () => (
     style={{
       width: '100%',
       minHeight: 200,
-      borderRadius: 'var(--stage-radius-card, 12px)',
+      borderRadius: 'var(--stage-radius-panel)',
       background:
         'linear-gradient(120deg, oklch(1 0 0 / 0.03) 0%, oklch(1 0 0 / 0.06) 50%, oklch(1 0 0 / 0.03) 100%)',
       backgroundSize: '200% 100%',

@@ -13,6 +13,8 @@ const PRESERVED_KEYS = new Set<string>([
 ]);
 
 const STALE_KEYS_BY_TYPE: Partial<Record<string, Record<string, null>>> = {
+  // Kept: a legacy couple row converted to person still needs its old keys
+  // cleared. Nothing can be converted TO couple any more.
   couple: Object.fromEntries(Object.values(COUPLE_ATTR).map(k => [k, null])),
   person: Object.fromEntries(
     Object.values(INDIVIDUAL_ATTR).filter(k => !PRESERVED_KEYS.has(k)).map(k => [k, null])
@@ -22,7 +24,25 @@ const STALE_KEYS_BY_TYPE: Partial<Record<string, Record<string, null>>> = {
   ),
 };
 
-export type ClientEntityType = 'company' | 'person' | 'couple';
+/**
+ * What a client record can be turned into.
+ *
+ * 'couple' is deliberately not here. Two people who buy together are two person
+ * entities joined by a CO_HOST edge -- that is what the show-creation flow
+ * writes, and each partner is their own node with their own name, phone and
+ * history. The `type='couple'` shape was the older model: six flat strings on
+ * one row, no phone for either person, nothing clickable.
+ *
+ * Offering it as a conversion target was worse than offering a lossy format. It
+ * destroyed the record: the stale-key null-out below clears first_name,
+ * last_name, email and phone, and nothing populates the partner keys in their
+ * place, so you got a nameless shell. Production has zero couple entities, so
+ * there is nothing that shape holds and nothing to migrate -- only the ability
+ * to make a new casualty, which is what this removes.
+ *
+ * If there really are two of them, add the second person and link them.
+ */
+export type ClientEntityType = 'company' | 'person';
 
 export type ReclassifyClientResult = { success: true } | { success: false; error: string };
 
@@ -31,6 +51,42 @@ export type ReclassifyClientResult = { success: true } | { success: false; error
  * Only works on entities owned by the current workspace.
  * Used to correct mistakes (e.g. company → person, or person → couple).
  */
+/**
+ * Names the person this entity is linked to, or null when it is linked to
+ * nobody.
+ *
+ * Two people joined by a CO_HOST edge ARE the couple -- that is what the
+ * show-creation flow writes, and each partner is their own node. Converting one
+ * of them to `type='couple'` does not express that better, it destroys it: the
+ * stale-key null-out clears first_name, last_name, email and phone, nothing
+ * populates the partner_a and partner_b keys in their place, and the other
+ * partner's edge is left pointing at a nameless shell. Converting to 'company'
+ * orphans the edge the same way, so one rule covers both -- an entity that is
+ * linked to someone cannot change what it is until that link is dealt with.
+ *
+ * A former link still counts. The edge is the thing that would be orphaned, and
+ * it survives the pair ending on purpose.
+ */
+async function describeCoupleLink(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entityId: string,
+): Promise<string | null> {
+  const { data: edges } = await supabase
+    .schema('cortex').from('relationships')
+    .select('target_entity_id')
+    .eq('source_entity_id', entityId)
+    .eq('relationship_type', 'CO_HOST')
+    .limit(1);
+  if (!edges || edges.length === 0) return null;
+
+  const { data: partner } = await supabase
+    .schema('directory').from('entities')
+    .select('display_name')
+    .eq('id', edges[0].target_entity_id)
+    .maybeSingle();
+  return partner?.display_name ?? 'someone else';
+}
+
 export async function reclassifyClientEntity(
   entityId: string,
   newType: ClientEntityType
@@ -57,6 +113,14 @@ export async function reclassifyClientEntity(
   const attrs = readEntityAttrs(entity.attributes, attrType as Parameters<typeof readEntityAttrs>[1]);
   if ((attrs as { category?: string | null }).category !== 'client') {
     return { success: false, error: 'Only client entities can be reclassified.' };
+  }
+
+  const link = await describeCoupleLink(supabase, entityId);
+  if (link) {
+    return {
+      success: false,
+      error: `This person is linked to ${link}. Remove the link before changing what they are.`,
+    };
   }
 
   const { error } = await supabase

@@ -144,7 +144,6 @@ export async function resolveWorkspacesForUser(): Promise<ResolutionResult> {
         .select(`
           workspace_id,
           role,
-          created_at,
           workspaces:workspace_id (
             id,
             name
@@ -178,7 +177,10 @@ export async function resolveWorkspacesForUser(): Promise<ResolutionResult> {
               id: membership.workspace_id,
               name: ws?.name ?? null,
               role: membership.role,
-              joinedAt: membership.created_at,
+              // `workspace_members` has no created_at. Asking for one made this
+              // whole diagnostic query 400 -- which a workspace diagnostic
+              // reporting on RLS health could ill afford.
+              joinedAt: null,
             });
           }
         }

@@ -17,7 +17,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileEdit, Globe } from 'lucide-react';
+import { FileEdit } from 'lucide-react';
 import { useWorkspace } from '@/shared/ui/providers/WorkspaceProvider';
 import { networkQueries } from '@/features/network-data/api/queries';
 import { queryKeys } from '@/shared/api/query-keys';
@@ -34,9 +34,13 @@ import { NodeCrewList } from './NodeCrewList';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { PromotedMetricsRow } from './PromotedMetricsRow';
+import { EntityStateChip } from './EntityStateChip';
+import { LinkedPeople } from '@/features/network-data/ui/LinkedPeople';
 import { ContactStrip } from './network-detail-sheet/contact-strip';
 import { TransmissionPanel } from './network-detail-sheet/transmission-panel';
 import { getTabsForDetail, type TabId } from './network-detail-sheet/shared';
+import { useNeighbours, type VisibleEntry } from '@/widgets/network-stream/model/visible-order';
+import { PeekNav } from './PeekNav';
 
 interface NetworkDetailSheetProps {
   /** When provided, useQuery fetches details internally. */
@@ -57,6 +61,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
   const { workspaceId } = useWorkspace();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<TabId>('transmission');
+  const { previous, next, position } = useNeighbours(nodeId);
 
   // Fetch details via useQuery when nodeId/kind are provided; fall back to prop.
   // `placeholderData: keepPreviousData` holds the previous entity's payload
@@ -142,34 +147,32 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
         data-surface="surface"
       >
         <SheetHeader>
+          {/* Step through what is on screen without closing. A peek you cannot
+              move within is a cramped page: you open the wrong contact and the
+              only way to the next is to close, find your place, and open
+              again. */}
+          <PeekNav
+            previous={previous}
+            next={next}
+            position={position}
+            onGo={(entry: VisibleEntry) =>
+              router.push(`/network?nodeId=${encodeURIComponent(entry.id)}&kind=${encodeURIComponent(entry.kind)}`)
+            }
+          />
           <SheetTitle className="truncate">{details.identity.name}</SheetTitle>
           <div className="flex shrink-0 items-center gap-1">
-            {/* Ghost partner — edit their external entity profile */}
-            {isPartner && details.isGhost && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(`/network/entity/${details.id}?kind=external_partner${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)]"
-              >
-                <FileEdit className="size-4" strokeWidth={1.5} />
-                Edit
-              </Button>
-            )}
-            {/* Internal employee / contractor — navigate to their person entity studio */}
-            {!isPartner && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(`/network/entity/${details.id}?kind=${details.kind}${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
-                className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.08)]"
-              >
-                <FileEdit className="size-4" strokeWidth={1.5} />
-                Edit
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--stage-text-secondary)]" aria-label="View profile">
-              <Globe className="size-4" strokeWidth={1.5} />
+            {/* One way through, and it does not say "Edit". Edit warns you are
+                about to change something, which makes a page you might only
+                want to READ feel like a place to avoid -- and this is where the
+                full history and the documents live. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/network/entity/${details.id}?kind=${details.kind}${returnPath ? `&from=${encodeURIComponent(returnPath)}` : ''}`)}
+              className="h-8 gap-1.5 px-2 text-[var(--stage-text-secondary)] hover:bg-[oklch(1_0_0/0.08)] hover:text-[var(--stage-text-primary)]"
+            >
+              <FileEdit className="size-4" strokeWidth={1.5} />
+              Open full profile
             </Button>
             <SheetClose />
           </div>
@@ -181,6 +184,30 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
               sourceOrgId={sourceOrgId}
               onSummonSuccess={handleRefresh}
             />
+
+            {/* The triage byte, before anything else on the record: the one
+                fact that could change what you were about to do. */}
+            {workspaceId && details.subjectEntityId && (
+              <div className="px-6 pb-2">
+                <EntityStateChip
+                  workspaceId={workspaceId}
+                  entityId={details.subjectEntityId}
+                  doNotRebook={details.doNotRebook}
+                />
+              </div>
+            )}
+
+            {/* Who else is on this record, directly under the name. The graph
+                has carried this since the show was created and nothing has ever
+                read it. */}
+            {workspaceId && details.subjectEntityId && (
+              <LinkedPeople
+                workspaceId={workspaceId}
+                entityId={details.subjectEntityId}
+                hrefFor={(id) => `/network/entity/${id}`}
+                className="px-6 pb-2"
+              />
+            )}
 
             {/* Promoted metrics — two that earn inline placement per §10 */}
             {workspaceId && details.subjectEntityId && (() => {
@@ -203,7 +230,7 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
             <ContactStrip details={details} />
 
             {/* Tab strip with sliding indicator */}
-            <div className="shrink-0 border-b border-[var(--stage-edge-subtle)] px-6">
+            <div className="shrink-0 border-b border-[oklch(1_0_0_/_0.06)] px-6">
               <div className="relative flex h-12" role="tablist">
                 {getTabsForDetail(details).map((tab) => {
                   const displayLabel = tab.id === 'crew' && details.entityDirectoryType === 'venue'
@@ -254,14 +281,13 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={STAGE_NAV_CROSSFADE}
-                  className="space-y-5"
+                  className="flex flex-col" style={{ gap: 'var(--stage-gap-wide)' }}
                 >
                   <TransmissionPanel
                     details={details}
                     workspaceId={workspaceId ?? null}
                     sourceOrgId={sourceOrgId}
                     onRefresh={handleRefresh}
-                    onClose={handleClose}
                   />
                 </motion.div>
               )}

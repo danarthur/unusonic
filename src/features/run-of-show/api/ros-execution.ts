@@ -2,6 +2,7 @@
 
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
+import type { Json } from '@/types/supabase';
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -39,7 +40,7 @@ async function setExecutionState(eventId: string, state: RosExecutionState | nul
   const { error } = await supabase
     .schema('ops')
     .from('events')
-    .update({ ros_execution_state: state as unknown as Record<string, unknown> })
+    .update({ ros_execution_state: state as unknown as Json })
     .eq('id', eventId);
 
   if (error) throw new Error(error.message);

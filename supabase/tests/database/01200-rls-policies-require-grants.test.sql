@@ -20,9 +20,22 @@
 -- WITH CHECK (false) exists to forbid the operation (e.g. cortex write
 -- protection, where writes go through SECURITY DEFINER RPCs), so it must NOT
 -- have a grant.
+--
+-- One table is granted per column rather than per table: `public.workspaces`
+-- revokes table UPDATE and re-grants the settings columns, so an owner can
+-- change the portal theme and cannot change subscription_tier. That is a
+-- deliberate exception, and it is listed as one below rather than relaxing the
+-- rule for everybody.
+--
+-- The first version of this accepted `has_any_column_privilege` everywhere,
+-- which sounds equivalent and is not: that predicate is satisfied by ONE
+-- granted column, so a settings column added without a grant would 42501 on
+-- every write and this test would stay green -- the exact outage class in the
+-- header, admitted by the fix for it. Hence the named exception plus the
+-- exact-set assertion at the bottom.
 
 BEGIN;
-SELECT plan(1);
+SELECT plan(2);
 
 -- Tables where the absence of a grant is intentional and reviewed.
 CREATE TEMP TABLE grant_exceptions (sch text, tbl text, priv text, reason text);
@@ -32,7 +45,9 @@ INSERT INTO grant_exceptions VALUES
   ('cortex', 'aion_refusal_log', NULL,
    'Written by service role only; no session-client caller.'),
   ('directory', 'entity_documents', 'DELETE',
-   'Documents are archived via UPDATE (status = archived); no hard-delete path.');
+   'Documents are archived via UPDATE (status = archived); no hard-delete path.'),
+  ('public', 'workspaces', 'UPDATE',
+   'Granted per column, not per table — see the exact-set assertion below.');
 
 CREATE TEMP VIEW policy_grant_gaps AS
 WITH pol AS (
@@ -84,6 +99,27 @@ SELECT is(
          ' -- missing: ' || (SELECT string_agg(sch || '.' || tbl || ' ' || priv, ', ' ORDER BY sch, tbl, priv)
                              FROM policy_grant_gaps),
          '')
+);
+
+-- The exception above is only safe if the exception is exactly what we think it
+-- is. Assert the granted set, not a denylist of six names somebody has to
+-- remember to extend: this fails if a commercial column is granted, if a plain
+-- `GRANT UPDATE ON public.workspaces` lands, AND if a settings column is added
+-- without its grant -- which is the case the first version of this test missed.
+SELECT set_eq(
+  $$SELECT column_name::text
+      FROM information_schema.column_privileges
+     WHERE table_schema = 'public' AND table_name = 'workspaces'
+       AND grantee = 'authenticated' AND privilege_type = 'UPDATE'$$,
+  ARRAY[
+    'portal_theme_preset', 'portal_theme_config',
+    'default_deposit_percent', 'default_deposit_deadline_days',
+    'default_balance_due_days_before_event',
+    'sms_signin_enabled', 'require_equipment_verification',
+    'sending_domain', 'resend_domain_id', 'sending_domain_status',
+    'sending_from_name', 'sending_from_localpart', 'dmarc_status'
+  ],
+  'authenticated may update exactly the settings columns on public.workspaces'
 );
 
 SELECT * FROM finish();

@@ -26,6 +26,7 @@ import {
   getTeamPreview,
   type TeamMemberPreview,
 } from '../api/get-team-preview';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface TeamCardProps {
   workspaceId: string;
@@ -47,7 +48,7 @@ export function TeamCard({ workspaceId, entityId, onSeeAll }: TeamCardProps) {
   if (isLoading) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-20 rounded stage-skeleton" />
@@ -68,12 +69,12 @@ export function TeamCard({ workspaceId, entityId, onSeeAll }: TeamCardProps) {
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Users className="size-3 text-[var(--stage-text-tertiary)]" strokeWidth={1.5} />
+          <Users className="size-3 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
           <h3 className="stage-label text-[var(--stage-text-secondary)]">
             {isSolo ? 'Principal' : 'Team'}
           </h3>
@@ -132,7 +133,7 @@ function TeamRow({
       >
         <div className="flex items-start gap-2">
           <User
-            className="size-3.5 mt-0.5 shrink-0 text-[var(--stage-text-tertiary)]"
+            className="size-3.5 mt-0.5 shrink-0 text-[var(--stage-text-secondary)]"
             strokeWidth={1.5}
           />
           <div className="flex-1 min-w-0 space-y-0.5">
@@ -143,7 +144,7 @@ function TeamRow({
               </span>
               {isPrincipal && (
                 <span
-                  className="inline-flex items-center gap-0.5 text-[10px] text-[var(--stage-text-tertiary)]"
+                  className="inline-flex items-center gap-0.5 text-[10px] text-[var(--stage-text-secondary)]"
                   title="Principal contact — the person behind this entity"
                 >
                   <Star className="size-2.5" strokeWidth={1.5} />
@@ -151,7 +152,7 @@ function TeamRow({
                 </span>
               )}
               {member.role && (
-                <span className="text-[11px] text-[var(--stage-text-tertiary)] truncate">
+                <span className="text-[11px] text-[var(--stage-text-secondary)] truncate">
                   · {member.role}
                 </span>
               )}
@@ -171,7 +172,7 @@ function TeamRow({
                 {member.lastCaptureSnippet}
               </p>
             ) : (
-              <p className="text-[11px] text-[var(--stage-text-tertiary)] italic">
+              <p className="text-[11px] text-[var(--stage-text-secondary)] italic">
                 No notes yet
               </p>
             )}
@@ -188,15 +189,3 @@ function TeamRow({
   );
 }
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}

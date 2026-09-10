@@ -31,6 +31,7 @@ import {
   type ReferralDirection,
 } from '../api/get-referrals';
 import { logReferral, deleteReferral } from '../api/log-referral';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface ReferralsCardProps {
   workspaceId: string;
@@ -61,7 +62,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
         setFormOpen(false);
         invalidate();
       } else {
-        toast.error(result.error);
+        toast.error(result.error, { duration: Infinity });
       }
     },
   });
@@ -93,7 +94,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
           'w-full text-left inline-flex items-center gap-2 px-3 py-2',
           'rounded-md border border-dashed border-[var(--stage-edge-subtle)]',
           'bg-transparent',
-          'text-[var(--stage-text-tertiary)] hover:text-[var(--stage-text-secondary)]',
+          'text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-secondary)]',
           'hover:border-[var(--stage-edge-top)] transition-colors',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stage-accent)]/50',
         )}
@@ -111,12 +112,12 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Handshake className="size-3 text-[var(--stage-text-tertiary)]" strokeWidth={1.5} />
+          <Handshake className="size-3 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
           <h3 className="stage-label text-[var(--stage-text-secondary)]">Referrals</h3>
           {referrals && (
             <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
@@ -128,7 +129,7 @@ export function ReferralsCard({ workspaceId, entityId }: ReferralsCardProps) {
           type="button"
           onClick={() => setFormOpen((v) => !v)}
           className={cn(
-            'p-1 rounded-md text-[var(--stage-text-tertiary)]',
+            'p-1 rounded-md text-[var(--stage-text-secondary)]',
             'hover:text-[var(--stage-text-primary)] hover:bg-[oklch(1_0_0/0.06)]',
             'transition-colors',
           )}
@@ -219,7 +220,8 @@ function ReferralForm({
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={STAGE_MEDIUM}
-      className="overflow-hidden rounded-lg border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)] p-3 space-y-2"
+      className="overflow-hidden rounded-[var(--stage-radius-nested)] bg-[var(--ctx-well)] p-3 space-y-2"
+      data-surface="surface"
     >
       <div className="flex gap-1.5">
         {(['received', 'sent'] as const).map((d) => (
@@ -251,9 +253,9 @@ function ReferralForm({
         disabled={saving}
         className={cn(
           'w-full text-sm px-2 py-1.5 rounded-md',
-          'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]',
+          'border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
           'text-[var(--stage-text-primary)]',
-          'placeholder:text-[var(--stage-text-tertiary)]',
+          'placeholder:text-[var(--stage-text-secondary)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
         )}
       />
@@ -265,9 +267,9 @@ function ReferralForm({
         disabled={saving}
         className={cn(
           'w-full text-xs px-2 py-1.5 rounded-md',
-          'border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)]',
+          'border border-[oklch(1_0_0_/_0.08)] bg-[var(--ctx-well)]',
           'text-[var(--stage-text-primary)]',
-          'placeholder:text-[var(--stage-text-tertiary)]',
+          'placeholder:text-[var(--stage-text-secondary)]',
           'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
         )}
       />
@@ -361,7 +363,7 @@ function ReferralRow({
         <p className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] truncate">
           {referral.clientName ?? 'Unnamed lead'}
         </p>
-        <div className="flex items-center gap-2 text-[11px] text-[var(--stage-text-tertiary)]">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--stage-text-secondary)]">
           <span className="tabular-nums">{relative}</span>
           {referral.createdByName && (
             <span>· {referral.createdByName}</span>
@@ -371,7 +373,7 @@ function ReferralRow({
           // "at the time" is load-bearing, not decoration: the person may have
           // moved since, and this states which era the credit belongs to
           // rather than implying they still work there.
-          <p className="text-[11px] text-[var(--stage-text-tertiary)] truncate">
+          <p className="text-[11px] text-[var(--stage-text-secondary)] truncate">
             {referral.counterparty.nameAtReferral ?? 'Unknown'}
             {' · '}
             <span className="text-[var(--stage-text-secondary)]">
@@ -402,7 +404,7 @@ function ReferralRow({
           'shrink-0 p-1 rounded-md transition-all',
           confirmDelete
             ? 'text-[var(--color-unusonic-error)]'
-            : 'text-[var(--stage-text-tertiary)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+            : 'text-[var(--stage-text-secondary)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
           'hover:text-[var(--color-unusonic-error)] hover:bg-[oklch(1_0_0/0.06)]',
         )}
       >
@@ -414,15 +416,3 @@ function ReferralRow({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}

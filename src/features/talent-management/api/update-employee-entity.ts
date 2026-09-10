@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { PERSON_ATTR } from '@/entities/directory/model/attribute-keys';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 // ─── Input schema ─────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export async function updateEmployeeEntityAttrs(
 
   // 3. Build attributes patch — only include fields that are not undefined.
   //    Empty string → null (clear the field).
-  const patch: Record<string, unknown> = {};
+  const patch: JsonObject = {};
 
   patch[PERSON_ATTR.first_name] = first_name;
 
@@ -169,13 +170,17 @@ export async function updateEmployeeEntityAttrs(
     }
   }
 
-  // 6. Update display_name on the entity
+  // 6. Update display_name on the entity.
+  //    Scoped to the caller's workspace as well as the id -- RLS covers this,
+  //    but this is now the single write path for both roster members and
+  //    preferred freelancers, so the guard is stated rather than assumed.
   const displayName = [first_name, last_name].filter(Boolean).join(' ');
   await supabase
     .schema('directory')
     .from('entities')
     .update({ display_name: displayName })
-    .eq('id', entityId);
+    .eq('id', entityId)
+    .eq('owner_workspace_id', workspaceId);
 
   // 7. Revalidate and return
   revalidatePath('/network');

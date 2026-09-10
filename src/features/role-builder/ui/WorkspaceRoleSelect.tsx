@@ -14,7 +14,13 @@ import { getWorkspaceRolesForBuilder, updateMemberRole } from '../api/actions';
 
 export interface WorkspaceRoleSelectProps {
   workspaceId: string;
-  memberId: string;
+  /**
+   * Who the role is being assigned to. This was `memberId` and was passed a
+   * `workspace_members.id` -- a column the table does not have, so the update
+   * filtered on nothing and the assignment failed. A member is identified by
+   * the workspace they are in and the user they are.
+   */
+  userId: string;
   value: string | null;
   disabled?: boolean;
   onSuccess?: () => void;
@@ -30,7 +36,7 @@ export interface WorkspaceRoleSelectProps {
  */
 export function WorkspaceRoleSelect({
   workspaceId,
-  memberId,
+  userId,
   value,
   disabled = false,
   onSuccess,
@@ -69,7 +75,7 @@ export function WorkspaceRoleSelect({
     async (roleId: string) => {
       setError(null);
       setSaving(true);
-      const res = await updateMemberRole(workspaceId, memberId, roleId);
+      const res = await updateMemberRole(workspaceId, userId, roleId);
       setSaving(false);
       if (res.success) {
         onSuccess?.();
@@ -77,7 +83,7 @@ export function WorkspaceRoleSelect({
         setError(res.error ?? 'Failed to update role');
       }
     },
-    [workspaceId, memberId, onSuccess]
+    [workspaceId, userId, onSuccess]
   );
 
   if (loading) {

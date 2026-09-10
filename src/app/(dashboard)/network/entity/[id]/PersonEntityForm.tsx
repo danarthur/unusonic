@@ -2,18 +2,15 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { updateIndividualEntity } from '@/app/(dashboard)/(features)/events/actions/update-individual-entity';
 import { reclassifyClientEntity } from '@/app/(dashboard)/(features)/events/actions/reclassify-client-entity';
 import type { IndividualAttrs } from '@/shared/lib/entity-attrs';
 import type { NodeDetail } from '@/features/network-data';
-import { DealsPanel, FinancePanel } from './entity-studio-panels';
-import { EntityDocumentsCard } from '@/features/network-data/ui/entity-documents-card';
-import { EntityOverviewCards } from '@/widgets/network-detail/ui/EntityOverviewCards';
-import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
+import { EntityKnowledgeCards } from './EntityKnowledgeCards';
+import { EntityRecordShell } from './EntityRecordShell';
+import { useConnectionDelete } from './use-connection-delete';
 import { toast } from 'sonner';
 
 const LABEL = 'stage-label';
@@ -23,11 +20,21 @@ export function PersonEntityForm({
   initialAttrs,
   returnPath,
   workspaceId,
+  sourceOrgId,
+  linkedNames,
 }: {
   details: NodeDetail;
   initialAttrs: IndividualAttrs;
   returnPath: string;
   workspaceId?: string;
+  /** The caller's own org. softDeleteGhostRelationship authorises against it. */
+  sourceOrgId: string;
+  /**
+   * Who this person is already linked to. Read on the server rather than
+   * queried here -- the shell's chip already fetches it, and a second copy in
+   * the body was one client query for one boolean.
+   */
+  linkedNames?: string[];
 }) {
   const router = useRouter();
   const [firstName, setFirstName] = React.useState(initialAttrs.first_name ?? '');
@@ -63,7 +70,18 @@ export function PersonEntityForm({
     });
   };
 
-  const handleReclassify = (newType: 'couple' | 'company') => {
+  // Former links count too: the edge is what would be orphaned, and it survives
+  // the pair ending on purpose.
+  const linkedTo = linkedNames && linkedNames.length > 0 ? linkedNames.join(' and ') : null;
+
+  const handleRemove = useConnectionDelete({
+    relationshipId: details.relationshipId,
+    sourceOrgId,
+    returnPath,
+    name: details.identity.name || 'Client',
+  });
+
+  const handleReclassify = (newType: 'company') => {
     if (!entityId) return;
     startReclassify(async () => {
       const result = await reclassifyClientEntity(entityId, newType);
@@ -78,52 +96,32 @@ export function PersonEntityForm({
   };
 
   return (
-    <div className="min-h-screen bg-[var(--stage-void)] pb-32">
-      <header className="sticky top-0 z-20 bg-[var(--stage-void)] border-b border-[var(--stage-edge-subtle)] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push(returnPath)} aria-label="Back">
-            <ArrowLeft className="size-5" strokeWidth={1.5} />
-          </Button>
-          <div>
-            <p className="stage-label">
-              Individual profile
-            </p>
-            <h1 className="text-xl font-medium text-[var(--stage-text-primary)] tracking-tight">
-              {displayName || 'Individual Client'}
-            </h1>
-          </div>
-        </div>
-        <AnimatePresence>
-          {hasChanges && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={STAGE_MEDIUM}
-              className="flex items-center gap-3"
-            >
-              <span className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">Unsaved changes</span>
-              <Button
-                onClick={handleSave}
-                disabled={isPending}
-                className="gap-2 stage-btn stage-btn-primary"
-              >
-                <Save className="size-4" strokeWidth={1.5} />
-                Save
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        {details.subjectEntityId && workspaceId && (
-          <EntityOverviewCards
+    <EntityRecordShell
+      entityId={details.subjectEntityId ?? null}
+      entityType="person"
+      workspaceId={workspaceId ?? null}
+      name={displayName || 'Individual Client'}
+      eyebrow="Individual profile"
+      avatarUrl={details.identity.avatarUrl}
+      avatarType="person"
+      returnPath={returnPath}
+      sourceOrgId={sourceOrgId}
+      doNotRebook={details.doNotRebook}
+      dirty={hasChanges}
+      saving={isPending}
+      onSave={handleSave}
+      actions={
+        handleRemove
+          ? [{ label: 'Remove connection', onSelect: handleRemove, critical: true }]
+          : undefined
+      }
+    >
+      {details.subjectEntityId && workspaceId && (
+          <EntityKnowledgeCards
             workspaceId={workspaceId}
             entityId={details.subjectEntityId}
             entityType="person"
             entityName={displayName || null}
-            density="page"
           />
         )}
 
@@ -170,42 +168,34 @@ export function PersonEntityForm({
           </div>
         </section>
 
-        {details.subjectEntityId && (
-          <>
-            <DealsPanel entityId={details.subjectEntityId} />
-            <FinancePanel entityId={details.subjectEntityId} />
-          </>
-        )}
-
-        {details.subjectEntityId && workspaceId && (
-          <EntityDocumentsCard
-            entityId={details.subjectEntityId}
-            entityType="person"
-            workspaceId={workspaceId}
-          />
-        )}
-
         <section className="stage-panel rounded-2xl overflow-hidden" data-surface="surface">
           <div className="px-5 py-4 border-b border-[var(--stage-edge-subtle)]">
             <h3 className="stage-label">
               Reclassify
             </h3>
           </div>
+          {/*
+            Somebody who is already linked to another person IS a couple --
+            two nodes and an edge, which is what the show flow writes. Offering
+            to "change to couple" said the opposite, and taking it would have
+            cleared their name, email and phone, filled in nothing in their
+            place, and left the other partner pointing at a nameless shell.
+          */}
+          {linkedTo ? (
+            <div className="px-5 py-4">
+              <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
+                Linked to {linkedTo}. Two people who are linked are already a couple —
+                remove the link before changing what this record is.
+              </p>
+            </div>
+          ) : (
           <div className="px-5 py-4 space-y-3">
             <p className="text-[length:var(--stage-label-size)] text-[var(--stage-text-secondary)]">
               Change this client record type. Existing field data from the old type will be cleared.
+              If there are two of them, add the second person and link them rather than
+              changing this record.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={reclassifyPending}
-                onClick={() => handleReclassify('couple')}
-                className="border-[var(--stage-edge-subtle)] text-[var(--stage-text-secondary)] hover:text-[var(--stage-text-primary)] hover:bg-[var(--ctx-well)]"
-              >
-                Change to couple
-              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -218,8 +208,8 @@ export function PersonEntityForm({
               </Button>
             </div>
           </div>
+          )}
         </section>
-      </div>
-    </div>
+    </EntityRecordShell>
   );
 }

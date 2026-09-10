@@ -1,12 +1,14 @@
 'use server';
  
 
+import { syncDealMainContact } from './sync-deal-main-contact';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { resolveWorkspaceOrgEntityId } from '@/entities/organization/api/resolve-workspace-org-entity';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealStakeholderRole } from '../lib/stakeholder-roles';
+import { billToDiffering, type BillToRow } from './bill-to-diff';
 
 // NOTE: do NOT re-export `DealStakeholderRole` from this file.
 // Next.js 16 bundles 'use server' files through a server-action
@@ -343,7 +345,23 @@ export async function addDealStakeholder(
   return { success: true, id: inserted.id };
 }
 
-export type SetPrimaryHostResult = { success: true } | { success: false; error: string };
+export type SetPrimaryHostResult =
+  | {
+      success: true;
+      /**
+       * Named when the invoice still bills whoever just stopped being primary.
+       *
+       * Primary host and bill-to are separate roles on purpose -- a parent or a
+       * company often pays for a wedding neither of them is hosting -- so
+       * promoting a host deliberately does NOT move the money. What would be
+       * wrong is doing that silently: every published model is explicit about
+       * what its primary flag controls (Tripleseat: only the primary contact
+       * flows onto documents; NPSP: the primary becomes primary on the
+       * Opportunity). This is how the caller can say so.
+       */
+      billToUnchangedFor: string | null;
+    }
+  | { success: false; error: string };
 
 /**
  * Promote a host-role stakeholder to primary. Atomic within a single RPC-
@@ -401,7 +419,45 @@ export async function setPrimaryHost(
     .eq('deal_id', dealId);
   if (promoteErr) return { success: false, error: promoteErr.message };
 
-  return { success: true };
+  // The deal is filed under whoever is primary, so the column that answers
+  // "who is this for" has to follow the star rather than drift behind it.
+  const synced = await syncDealMainContact(dealId);
+  if (!synced.ok) console.error('[CRM] setPrimaryHost main_contact sync:', synced.error);
+
+  return {
+    success: true,
+    billToUnchangedFor: await billToOtherThan(supabase, dealId, targetStakeholderId),
+  };
+}
+
+/**
+ * The name on the bill, when it is not the host who just became primary.
+ * Returns null when they agree, or when nobody is billed yet.
+ */
+async function billToOtherThan(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  dealId: string,
+  primaryStakeholderId: string,
+): Promise<string | null> {
+  const { data: rows } = await supabase
+    .schema('ops').from('deal_stakeholders')
+    .select('id, role, entity_id, contact_name_at_deal, organization_name_at_deal')
+    .eq('deal_id', dealId)
+    .in('role', ['host', 'bill_to']);
+  if (!rows) return null;
+
+  const billTo = billToDiffering(rows as BillToRow[], primaryStakeholderId);
+  if (!billTo) return null;
+
+  if (billTo.entity_id) {
+    const { data: entity } = await supabase
+      .schema('directory').from('entities')
+      .select('display_name')
+      .eq('id', billTo.entity_id)
+      .maybeSingle();
+    if (entity?.display_name) return entity.display_name;
+  }
+  return billTo.contact_name_at_deal ?? billTo.organization_name_at_deal ?? null;
 }
 
 export type SetPocResult =

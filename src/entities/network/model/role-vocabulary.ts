@@ -81,11 +81,3 @@ export function normalizeRoleLabel(input: string): string {
     .replace(/^_+|_+$/g, '')
     .replace(/_+/g, '_');
 }
-
-/**
- * Below this many people a category is scannable and role headers are noise;
- * above it, finding someone by role is the actual task. Auto-revealing at a
- * threshold is what lets a small workspace stay flat and a large one get
- * structure without either having to configure anything.
- */
-export const ROLE_GROUPING_THRESHOLD = 12;

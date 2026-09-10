@@ -62,10 +62,10 @@ export async function logReferral(
       p_workspace_id: input.workspaceId,
       p_direction: input.direction,
       p_counterparty_entity_id: input.counterpartyEntityId,
-      p_client_name: input.clientName ?? null,
-      p_client_entity_id: input.clientEntityId ?? null,
-      p_related_deal_id: input.relatedDealId ?? null,
-      p_note: input.note ?? null,
+      p_client_name: input.clientName ?? undefined,
+      p_client_entity_id: input.clientEntityId ?? undefined,
+      p_related_deal_id: input.relatedDealId ?? undefined,
+      p_note: input.note ?? undefined,
       p_counterparty_org_entity_id: input.counterpartyOrgEntityId ?? undefined,
     });
 

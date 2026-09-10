@@ -21,7 +21,11 @@ import {
   sumBy,
   countBy,
   attachAffiliations,
+  fetchWorkedWithNodes,
 } from './stream-helpers';
+import { readEntityRegion } from '@/entities/directory/model/read-region';
+import { readRate } from '@/entities/directory/model/read-rate';
+import { attachShowDates } from './show-dates';
 import { ROLE_ORDER, getCurrentEntityAndOrg } from '../network-helpers';
 
 /**
@@ -86,7 +90,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   // All entity IDs for referral count lookup (roster + partners)
   const allEntityIds = [...new Set([...personEntityIds, ...allPartnerEntityIds])];
 
-  const [personEntRes, partnerEntRes, invoicesRes, crewSkillsRes, referralCountRes, capabilitiesRes] = await Promise.all([
+  const [personEntRes, partnerEntRes, invoicesRes, expensesRes, crewSkillsRes, referralCountRes, capabilitiesRes] = await Promise.all([
     personEntityIds.length > 0
       ? supabase.schema('directory').from('entities')
           .select('id, display_name, avatar_url, type, attributes')
@@ -104,6 +108,15 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
           .in('bill_to_entity_id', allPartnerEntityIds)
           .not('status', 'in', '(paid,void)')
       : { data: [] as { bill_to_entity_id: string; total_amount: number }[] },
+    // The other direction: expenses recorded against them that we have not
+    // paid. Kept separate from the receivable, never netted against it.
+    allPartnerEntityIds.length > 0
+      ? supabase.schema('ops').from('event_expenses')
+          .select('vendor_entity_id, amount')
+          .in('vendor_entity_id', allPartnerEntityIds)
+          .eq('workspace_id', orgId)
+          .is('paid_at', null)
+      : { data: [] as { vendor_entity_id: string; amount: number }[] },
     // Crew skills from ops.crew_skills (source of truth)
     allPersonEntityIds.length > 0
       ? supabase.schema('ops').from('crew_skills')
@@ -131,6 +144,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
   const { crewSkillsByEntityId, crewRolesByEntityId } = indexCrewSkills(crewSkillsRes.data);
   const capabilitiesByEntityId = indexByEntity(capabilitiesRes.data, 'capability');
   const balanceMap = sumBy(invoicesRes.data, 'bill_to_entity_id', 'total_amount');
+  const payableMap = sumBy(expensesRes.data, 'vendor_entity_id', 'amount');
   const referralCountMap = countBy(referralCountRes.data, 'referrer_entity_id');
 
   const personMap = new Map((personEntRes.data ?? []).map((p) => [p.id, p]));
@@ -155,13 +169,13 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const coiExpiry = (attrs[PERSON_ATTR.coi_expiry] as string | null) ?? null;
     const market = (attrs[PERSON_ATTR.market] as string | null) ?? null;
     const unionStatus = (attrs[PERSON_ATTR.union_status] as string | null) ?? null;
+    const rate = readRate(attrs);
     return {
       id: edge.id,
       entityId: edge.source_entity_id,
       kind: isExternal ? 'extended_team' : 'internal_employee',
       gravity: 'core',
       relationshipType: 'ROSTER_MEMBER',
-      roleGroup: jobTitle || null,
       identity: { name, avatarUrl, label: jobTitle || role || 'Member', entityType },
       meta: {
         email: email ?? undefined,
@@ -174,6 +188,8 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         w9_status: w9Status,
         coi_expiry: coiExpiry,
         market,
+        region: market,
+        rate,
         union_status: unionStatus,
       },
     };
@@ -216,11 +232,13 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const partner = partnerMap.get(edge.target_entity_id);
     const ctx = (edge.context_data as Record<string, unknown>) ?? {};
     const balance = balanceMap.get(edge.target_entity_id) ?? 0;
+    const payable = payableMap.get(edge.target_entity_id) ?? 0;
     const refCount = referralCountMap.get(edge.target_entity_id) ?? 0;
     const entityType = (partner?.type as 'person' | 'company' | 'venue' | 'couple') ?? undefined;
     const attrs = (partner?.attributes as Record<string, unknown>) ?? {};
     const relType = edge.relationship_type as NetworkNode['relationshipType'];
     const email = readContactEmail(entityType, attrs);
+    const rate = readRate(attrs);
     // Only persons on PARTNER / VENDOR edges act as "freelancers" with a
     // job-title-based roleGroup. CLIENT-edge persons are wedding hosts or
     // individual clients and should NOT be grouped with crew.
@@ -236,10 +254,11 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
       kind: 'external_partner',
       gravity: 'inner_circle',
       relationshipType: relType,
-      roleGroup: personJobTitle,
       identity: {
         name: partner?.display_name ?? 'Unknown',
-        avatarUrl: null,
+        // Was hard-coded null, so a preferred partner -- the people most likely
+        // to have a photo on file -- was the one group that never showed one.
+        avatarUrl: partner?.avatar_url ?? null,
         label,
         entityType,
       },
@@ -252,7 +271,10 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
           ? (capabilitiesByEntityId.get(edge.target_entity_id) ?? [])
           : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        ...(payable > 0 ? { payable_balance: payable } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
+        region: readEntityRegion(entityType, attrs),
+        rate,
         connectedSince: (edge as { created_at?: string }).created_at ?? undefined,
       },
     };
@@ -262,6 +284,7 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     const ctx = (rel.context_data as Record<string, unknown>) ?? {};
     const partnerEnt = partnerEntMap.get(rel.target_entity_id);
     const balance = balanceMap.get(rel.target_entity_id) ?? 0;
+    const payable = payableMap.get(rel.target_entity_id) ?? 0;
     const refCount = referralCountMap.get(rel.target_entity_id) ?? 0;
 
     // Use the edge column as the canonical type source — context_data.relationship_type
@@ -287,7 +310,9 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
         email,
         tags: Array.isArray(ctx.industry_tags) ? (ctx.industry_tags as string[]) : [],
         ...(balance > 0 ? { outstanding_balance: balance } : {}),
+        ...(payable > 0 ? { payable_balance: payable } : {}),
         ...(refCount > 0 ? { referral_count: refCount } : {}),
+        region: readEntityRegion(entityType, attrs),
         connectedSince: (rel as { created_at?: string }).created_at ?? undefined,
       },
     };
@@ -299,16 +324,32 @@ export async function getNetworkStream(orgId: string): Promise<NetworkNode[]> {
     (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
   );
 
-  const merged = withCrewRoles(crewRolesByEntityId, withStars(starredIds, mergeNodesByEntity([
+  const edgeNodes = [
     ...coreNodes,
     ...extendedTeamNodes,
     ...innerCircleNodes,
     ...outerOrbitNodes,
-  ])));
+  ];
+
+  // People with real deal history whom nobody filed with an edge. Added after
+  // the edge-built set so an explicit relationship always wins over an inferred
+  // one, and so nobody appears twice.
+  const workedWith = await fetchWorkedWithNodes(
+    supabase,
+    (orgDirEnt as { owner_workspace_id?: string | null }).owner_workspace_id ?? null,
+    new Set(edgeNodes.map((n) => n.entityId)),
+  );
+
+  const merged = withCrewRoles(crewRolesByEntityId, withStars(starredIds,
+    mergeNodesByEntity([...edgeNodes, ...workedWith])));
+
+  // Last worked / next booked, on the final merged set so a person reached
+  // through their company gets dates too.
+  const dated = await attachShowDates(supabase, orgId, merged);
 
   // Last, so it sees the final merged node set and can attach an employer to a
   // person node and the matching people to the company node in one pass.
-  return attachAffiliations(supabase, merged);
+  return attachAffiliations(supabase, dated);
 }
 
 /** Entity ids the signed-in user has starred in this workspace. */

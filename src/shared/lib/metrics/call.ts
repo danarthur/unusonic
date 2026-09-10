@@ -189,13 +189,20 @@ export async function callMetric(
   const client = opts.client ?? (await createClient());
   const rpcArgs = buildRpcArgs(workspaceId, validatedArgs);
 
-  // RPCs in non-public schemas need .schema(...). Cast to any because the
-  // generated supabase types only cover public; the finance schema is reached
-  // via the runtime escape hatch (tracked as PR-INFRA-2 in CLAUDE.md).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /*
+    Dynamic dispatch: the schema and the function name both come out of the
+    metric registry, so there is no literal for TypeScript to resolve against
+    the per-schema RPC name unions -- it intersects all five and lands on
+    `never`.
+
+    The old comment here said the generated types only covered public. That has
+    not been true since PR 6.5; the cast is for the dynamic name, and the name
+    is the one thing checked at runtime rather than compile time: the registry
+    is a closed table and `rpcArgs` is Zod-validated above.
+  */
   const { data, error } = await client
     .schema(definition.rpcSchema)
-    .rpc(definition.rpcName, rpcArgs);
+    .rpc(definition.rpcName as never, rpcArgs as never);
 
   if (error) {
     return {

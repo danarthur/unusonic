@@ -39,6 +39,18 @@ export const PERSON_ATTR = {
   market: 'market',
   /** Union affiliation — e.g. "IATSE Local 33", "Teamsters", "Non-union" */
   union_status: 'union_status',
+  /**
+   * Reference day rate, e.g. 450. What they cost, before any one show.
+   *
+   * Distinct from ops.deal_crew.day_rate, which is what was actually agreed on
+   * a specific booking. This is the number you quote from before you book, and
+   * before this existed it had nowhere to live but the text of a note.
+   */
+  rate_amount: 'rate_amount',
+  /** What the rate buys — "4 hrs", "day", "hr". A bare number is ambiguous. */
+  rate_unit: 'rate_unit',
+  /** Conditions in their own words, e.g. "500 if over an hour drive". */
+  rate_note: 'rate_note',
   /** CDL (Commercial Driver's License) — boolean */
   cdl: 'cdl',
   /** W-9 on file — boolean */
@@ -181,6 +193,15 @@ export const VENUE_ATTR = {
   house_power_amps: 'house_power_amps',
   /** IATSE local number / name — e.g. "IATSE Local 33" */
   union_local: 'union_local',
+  /**
+   * When each venue fact was last confirmed, keyed by attribute name.
+   *
+   * Venue facts go stale in specific ways -- new management, a renovation, a
+   * limiter fitted after a noise complaint -- and a spec with no date is a spec
+   * you cannot trust enough to act on. "Curfew 11 · confirmed Aug '24" tells
+   * you to ring and check; "Curfew 11" does not.
+   */
+  specs_confirmed: 'specs_confirmed',
   /** Whether house PA system is included */
   house_pa_included: 'house_pa_included',
   /** Whether house lighting rig is included */

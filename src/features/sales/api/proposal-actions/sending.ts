@@ -679,7 +679,7 @@ export async function sendProposalReminder(
   if (emailResult.messageId) {
     await supabase
       .from('proposals')
-      .update({ resend_message_id: emailResult.messageId } as Record<string, unknown>)
+      .update({ resend_message_id: emailResult.messageId })
       .eq('id', proposal.id);
   }
 

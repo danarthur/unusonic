@@ -10,7 +10,6 @@ import {
   roleSeedsFor,
   normalizeRoleLabel,
   ROLE_SEEDS,
-  ROLE_GROUPING_THRESHOLD,
 } from '../role-vocabulary';
 
 describe('role seeds', () => {
@@ -57,12 +56,5 @@ describe('normalizeRoleLabel', () => {
   it('returns empty for input with nothing usable', () => {
     expect(normalizeRoleLabel('   ')).toBe('');
     expect(normalizeRoleLabel('!!!')).toBe('');
-  });
-});
-
-describe('grouping threshold', () => {
-  it('is set where scanning stops being easier than filtering', () => {
-    expect(ROLE_GROUPING_THRESHOLD).toBeGreaterThanOrEqual(10);
-    expect(ROLE_GROUPING_THRESHOLD).toBeLessThanOrEqual(15);
   });
 });

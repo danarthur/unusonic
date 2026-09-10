@@ -27,6 +27,7 @@ import {
   getProductionCaptures,
   type ProductionCapture,
 } from '../api/get-production-captures';
+import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface ProductionCapturesPanelProps {
   workspaceId: string;
@@ -71,7 +72,7 @@ export function ProductionCapturesPanel({
   if (isLoading && captures.length === 0) {
     return (
       <div
-        className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-2"
+        className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-2"
         data-surface="elevated"
       >
         <div className="h-3 w-24 rounded stage-skeleton" />
@@ -82,7 +83,7 @@ export function ProductionCapturesPanel({
 
   return (
     <div
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <div className="flex items-center justify-between">
@@ -188,15 +189,3 @@ function EntityTypeIcon({ type }: { type: string | null }) {
   return <Building2 className="size-2.5" strokeWidth={1.5} />;
 }
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const ms = Date.now() - d.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}

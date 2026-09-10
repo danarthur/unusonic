@@ -47,6 +47,19 @@ export type UpdateCaptureInput =
       visibility: CaptureVisibility;
     }
   | {
+      /**
+       * Move a note between the profile and its show, by hand.
+       *
+       * Pins the placement: the classifier must never move a note a person
+       * placed, because a correction that can be undone by the next parse stops
+       * being made at all.
+       */
+      action: 'scope';
+      captureId: string;
+      /** 'about' keeps it on the profile, 'show' demotes it, null unclassifies. */
+      noteScope: 'about' | 'show' | null;
+    }
+  | {
       action: 'delete';
       captureId: string;
     };
@@ -129,8 +142,8 @@ export async function updateCapture(
     case 'edit': {
       const { error } = await cortex.rpc('update_capture_content', {
         p_capture_id: input.captureId,
-        p_transcript: input.transcript ?? null,
-        p_parsed_note: input.parsedNote ?? null,
+        p_transcript: input.transcript ?? undefined,
+        p_parsed_note: input.parsedNote ?? undefined,
       });
       if (error) return { ok: false, error: error.message };
 
@@ -162,9 +175,17 @@ export async function updateCapture(
       // Also revalidate the OLD entity page so its timeline drops the row.
       const oldEntityId = capture.resolved_entity_id;
 
+      /*
+        NULL is a supported argument here -- `cortex.reassign_capture` branches
+        on `p_new_entity_id IS NOT NULL` and un-assigns the capture when it is
+        null. The generated signature cannot say so: the parameter has no
+        DEFAULT, so codegen types it as a required non-nullable uuid, and there
+        is no way to express "required, and nullable". Giving the parameter a
+        `DEFAULT NULL` would make the type optional and remove the cast.
+      */
       const { error } = await cortex.rpc('reassign_capture', {
         p_capture_id: input.captureId,
-        p_new_entity_id: input.newEntityId,
+        p_new_entity_id: input.newEntityId as unknown as string,
       });
       if (error) return { ok: false, error: error.message };
 
@@ -191,6 +212,25 @@ export async function updateCapture(
       if (oldEntityId) revalidatePath(`/network/entity/${oldEntityId}`);
       if (input.newEntityId) revalidatePath(`/network/entity/${input.newEntityId}`);
       revalidatePath('/lobby');
+      return { ok: true };
+    }
+
+    case 'scope': {
+      const { data, error } = await cortex.rpc('set_capture_note_scope', {
+        p_capture_id: input.captureId,
+        // The RPC accepts NULL to unclassify; the generated arg type does not
+        // model that, and passing undefined would drop the argument entirely.
+        p_note_scope: input.noteScope as string,
+      });
+      if (error) return { ok: false, error: error.message };
+      // The RPC returns false rather than raising when it refuses -- a note that
+      // is not yours, or 'show' with no show attached. Saying nothing happened
+      // beats reporting a success that did not occur.
+      if (data === false) {
+        return { ok: false, error: 'Could not move that note.' };
+      }
+
+      invalidate();
       return { ok: true };
     }
 

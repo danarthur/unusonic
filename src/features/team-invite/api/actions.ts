@@ -14,6 +14,7 @@ import type { OrgMemberRole } from '@/entities/organization/model/types';
 import { sendEmployeeInviteEmail } from '@/shared/api/email/send';
 import { instrument } from '@/shared/lib/instrumentation';
 import { getCallerWorkspaceRole } from '@/entities/organization/api/caller-workspace-role';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 export type AcceptEmployeeInviteResult = { ok: true } | { ok: false; error: string };
 export type InviteEmployeeResult = { ok: true; message: string } | { ok: false; error: string };
@@ -215,7 +216,7 @@ export async function upsertGhostMember(
 
     // Update roster fields via patch_relationship_context
     const dbRole = role === 'manager' ? 'member' : role;
-    const patch: Record<string, unknown> = {
+    const patch: JsonObject = {
       first_name,
       last_name,
       job_title: job_title?.trim() || null,
@@ -268,7 +269,7 @@ export async function upsertGhostMember(
     p_last_name: last_name,
     p_email: emailTrim,
     p_role: (role === 'manager' ? 'member' : role) as RpcOrgMemberRole,
-    p_job_title: job_title?.trim() || null,
+    p_job_title: job_title?.trim() || undefined,
   });
 
   if (rpcErr) {

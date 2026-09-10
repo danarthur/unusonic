@@ -10,19 +10,12 @@ export type EmploymentStatus = 'internal_employee' | 'external_contractor';
 export type SkillLevel = Database['public']['Enums']['skill_level'];
 export type OrgMemberRole = 'owner' | 'admin' | 'manager' | 'member' | 'restricted';
 
-export interface TalentSkillRow {
-  id: string;
-  org_member_id: string;
-  skill_tag: string;
-  proficiency?: SkillLevel | null;
-  hourly_rate?: number | null;
-  verified?: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-}
-
-export type TalentSkillInsert = Partial<TalentSkillRow> & Pick<TalentSkillRow, 'org_member_id' | 'skill_tag'>;
-export type TalentSkillUpdate = Partial<Omit<TalentSkillRow, 'id'>>;
+/*
+  TalentSkillRow, TalentSkillInsert and TalentSkillUpdate stood here, describing
+  `public.talent_skills` keyed on `org_member_id`. That table does not exist --
+  skills are `ops.crew_skills`, keyed on the person's entity id -- so these were
+  the shape of nothing. CrewSkillDTO below is the row that is really stored.
+*/
 
 // Legacy row shapes (org_members table dropped in Session 10; kept for backward compat)
 export interface OrgMemberRow {
@@ -49,15 +42,14 @@ export type OrgMemberUpdate = Partial<OrgMemberRow>;
  * Migrate callers to ops.crew_skills via getCrewSkillsForEntity.
  *
  * Skill node for display (e.g. badge under member name). */
-export interface TalentSkillDTO {
-  id: string;
-  skill_tag: string;
-  proficiency: SkillLevel;
-  hourly_rate: number | null;
-  verified: boolean;
-}
+/*
+  TalentSkillDTO stood here, describing a row of `public.talent_skills`. That
+  table does not exist; skills live in `ops.crew_skills`, keyed by the person's
+  entity id rather than a legacy org_member_id. CrewSkillDTO is that row, and
+  is now the only one.
+*/
 
-/** Skill record from ops.crew_skills — replaces TalentSkillDTO for new code. */
+/** Skill record from ops.crew_skills. */
 export interface CrewSkillDTO {
   id: string;
   skill_tag: string;
@@ -102,7 +94,7 @@ export interface OrgMemberWithSkillsDTO {
    * @deprecated Legacy skills from public.talent_skills. Use getCrewSkillsForEntity() instead.
    * Kept for backward-compat with callers that haven't migrated. Do not read this field in new code.
    */
-  skills: TalentSkillDTO[];
+  skills: CrewSkillDTO[];
   /** From profiles join (fallback when first_name/last_name empty). */
   profiles?: { full_name: string | null; email: string | null } | null;
 }

@@ -2,6 +2,7 @@
 
 import 'server-only';
 import { createClient } from '@/shared/api/supabase/server';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 /** Employee self-service profile fields. Admin-controlled fields are excluded. */
 const ALLOWED_FIELDS = new Set(['phone', 'emergency_contact', 'instagram', 'music_library_path', 'apple_music_connected']);
@@ -28,14 +29,16 @@ export async function updateMyProfile(
   }
 
   // Filter to allowed fields only
-  const safePatch: Record<string, unknown> = {};
+  const safePatch: JsonObject = {};
   for (const [key, value] of Object.entries(patch)) {
     if (ALLOWED_FIELDS.has(key)) {
       if (typeof value === 'string') {
         safePatch[key] = value.trim() || null;
       } else if (value && typeof value === 'object') {
-        // Objects like emergency_contact: {name, phone}
-        safePatch[key] = value;
+        // Objects like emergency_contact: {name, phone}. The patch arrives as
+        // `Record<string, unknown>` from the client, so this is the boundary
+        // where a value is asserted to be JSON-shaped.
+        safePatch[key] = value as JsonObject;
       } else {
         safePatch[key] = null;
       }

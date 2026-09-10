@@ -17,7 +17,7 @@ import { displayableEmail } from '@/shared/lib/entity-attrs';
 import type { DealClientContext } from '../actions/get-deal-client';
 import { updateClientAddress } from '../actions/update-client-address';
 import { updateIndividualEntity } from '../actions/update-individual-entity';
-import { updatePrivateNotes } from '@/features/network/api/actions';
+import { updateClientPrivateNotes } from '../actions/update-client-private-notes';
 import { toast } from 'sonner';
 
 type ClientSummaryCardProps = {
@@ -177,8 +177,13 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
 
   const handleSaveNotes = () => {
     startNotesSave(async () => {
-      const result = await updatePrivateNotes(organization.id, notesDraft.trim() || null, null);
-      if (!result.ok) toast.error('Failed to save notes.');
+      // `organization.entityId`, not `organization.id` -- the latter is a legacy
+      // org id on two of the three paths that resolve a deal's client.
+      const result = await updateClientPrivateNotes(
+        organization.entityId,
+        notesDraft.trim() || null,
+      );
+      if (!result.ok) toast.error(result.error);
       else toast.success('Notes saved.');
     });
   };
@@ -321,6 +326,9 @@ function ClientDrawer({ client, open, onOpenChange }: ClientDrawerProps) {
             <h3 className="stage-label mb-3">
               Client notes
             </h3>
+            <p className="mb-2 text-xs text-[var(--stage-text-secondary)]">
+              Only your workspace sees these. They show on the client&rsquo;s contact record too.
+            </p>
             <textarea
               value={notesDraft}
               onChange={(e) => setNotesDraft(e.target.value)}

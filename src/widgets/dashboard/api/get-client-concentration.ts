@@ -47,7 +47,10 @@ export async function getClientConcentration(): Promise<ClientConcentrationData>
     .from('proposals')
     .select('id, deal_id')
     .in('deal_id', dealIds)
-    .in('status', ['accepted', 'signed']);
+    // `accepted` is the terminal status. 'signed' is not a member of the
+    // proposal_status enum, and naming it made Postgres reject the query --
+    // so this widget has been rendering empty rather than wrong.
+    .eq('status', 'accepted');
 
   if (!proposals?.length) return EMPTY;
 

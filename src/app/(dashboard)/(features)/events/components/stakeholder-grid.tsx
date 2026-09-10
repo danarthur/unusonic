@@ -756,13 +756,15 @@ export function StakeholderGrid({
             <p className="text-xs text-[var(--stage-text-secondary)]/70">
               Switch to the type that best describes this client. Their deals and proposals are unchanged.
             </p>
-            {(['company', 'person', 'couple'] as ClientEntityType[]).map((t) => {
+            {/* Not 'couple'. Two people who buy together are two person records
+                joined by a CO_HOST edge; converting one record into a couple
+                cleared its name, email and phone and filled in nothing. */}
+            {(['company', 'person'] as ClientEntityType[]).map((t) => {
               const isCurrent = reclassifySheet?.currentType === t;
               const isLoading = reclassifyingId === reclassifySheet?.entityId;
               const labels: Record<ClientEntityType, string> = {
                 company: 'Company / Organisation',
                 person: 'Individual',
-                couple: 'Couple / Duo',
               };
               return (
                 <button

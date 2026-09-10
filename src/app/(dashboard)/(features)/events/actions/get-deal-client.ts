@@ -13,7 +13,21 @@ export type DealClientContact = {
 };
 
 export type DealClientOrganization = {
+  /**
+   * The id the rest of the deal flow keys on.
+   *
+   * Depending on which path resolved the client, this is a legacy org id or a
+   * legacy entity id -- not necessarily a `directory.entities.id`. Anything that
+   * needs the real entity row wants `entityId` below.
+   */
   id: string;
+  /**
+   * `directory.entities.id` for this client, when one was found.
+   *
+   * Private notes are keyed (workspace_id, entity_id), so this is what they
+   * hang off. Null when the client could only be resolved as a legacy row.
+   */
+  entityId: string | null;
   name: string;
   category: string | null;
   support_email: string | null;
@@ -27,11 +41,42 @@ export type DealClientContext = {
   mainContact: DealClientContact | null;
   /** Number of deals (including current) with this organization in the workspace */
   pastDealsCount: number;
-  /** Internal notes about this client (from org_private_data when available) */
+  /** What this workspace privately records about the client. Never shown to them. */
   privateNotes: string | null;
   /** Org relationship id for opening Network Detail Sheet (nodeId for external_partner) */
   relationshipId: string | null;
 };
+
+/**
+ * What this workspace privately records about a contact.
+ *
+ * Keyed (workspace_id, entity_id) on `directory.entity_working_notes` -- the
+ * same row the record page's "How to handle" card writes, so a note taken on
+ * the deal page and a note taken on the contact are the same note.
+ *
+ * This used to read `public.org_private_data`, keyed (owner_org_id,
+ * subject_org_id). That table does not exist, so the read 404'd and every
+ * caller was handed a hardcoded null.
+ *
+ * Not exported: this file carries 'use server', where every export must be a
+ * directly-defined async function -- and a reader taking a Supabase client is
+ * not something to expose as a server action.
+ */
+async function readPrivateNotes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  entityId: string | null,
+): Promise<string | null> {
+  if (!entityId) return null;
+  const { data } = await supabase
+    .schema('directory')
+    .from('entity_working_notes')
+    .select('private_notes')
+    .eq('workspace_id', workspaceId)
+    .eq('entity_id', entityId)
+    .maybeSingle();
+  return data?.private_notes ?? null;
+}
 
 export async function getDealClientContext(
   dealId: string,
@@ -87,10 +132,11 @@ export async function getDealClientContext(
         .maybeSingle(),
     ]);
 
-    let orgDisplayData: { name: string; category: string | null; support_email: string | null; website: string | null; address: DealClientContext['organization']['address'] } | null = null;
+    let orgDisplayData: { entityId: string; name: string; category: string | null; support_email: string | null; website: string | null; address: DealClientContext['organization']['address'] } | null = null;
     if (orgDirRes.data) {
       const attrs = (orgDirRes.data.attributes as Record<string, unknown>) ?? {};
       orgDisplayData = {
+        entityId: orgDirRes.data.id,
         name: orgDirRes.data.display_name ?? '',
         category: (attrs[COMPANY_ATTR.category] as string | null) ?? null,
         support_email: (attrs[COMPANY_ATTR.support_email] as string | null) ?? null,
@@ -124,6 +170,7 @@ export async function getDealClientContext(
       return {
         organization: {
           id: orgId,
+          entityId: orgDisplayData.entityId,
           name: orgDisplayData.name,
           category: orgDisplayData.category,
           support_email: orgDisplayData.support_email,
@@ -138,7 +185,7 @@ export async function getDealClientContext(
           phone: null,
         } : null,
         pastDealsCount: 0,
-        privateNotes: null,
+        privateNotes: await readPrivateNotes(supabase, workspaceId, orgDisplayData.entityId),
         relationshipId: null,
       };
     }
@@ -148,7 +195,7 @@ export async function getDealClientContext(
   if (entityIdFromStakeholder && !orgId) {
     const { data: personOnlyDir } = await supabase
       .schema('directory').from('entities')
-      .select('display_name, attributes')
+      .select('id, display_name, attributes')
       .eq('legacy_entity_id', entityIdFromStakeholder)
       .maybeSingle();
     if (personOnlyDir) {
@@ -159,6 +206,7 @@ export async function getDealClientContext(
       return {
         organization: {
           id: entityIdFromStakeholder,
+          entityId: personOnlyDir.id,
           name: personName,
           category: null,
           support_email: personOnlyEmail ?? null,
@@ -167,7 +215,7 @@ export async function getDealClientContext(
         },
         mainContact: null,
         pastDealsCount: 0,
-        privateNotes: null,
+        privateNotes: await readPrivateNotes(supabase, workspaceId, personOnlyDir.id),
         relationshipId: null,
       };
     }
@@ -258,6 +306,7 @@ export async function getDealClientContext(
   return {
     organization: {
       id: orgId,
+      entityId: resolvedOrgDirData?.id ?? null,
       name: mainOrgName,
       category: mainOrgCategory,
       support_email: mainOrgSupportEmail,
@@ -266,8 +315,7 @@ export async function getDealClientContext(
     },
     mainContact: contactData,
     pastDealsCount: typeof count === 'number' ? count : 0,
-    /** Fetched separately in drawer via updatePrivateNotes / network API (owner_org_id required). */
-    privateNotes: null,
+    privateNotes: await readPrivateNotes(supabase, workspaceId, resolvedOrgDirData?.id ?? null),
     relationshipId: relId,
   };
 }

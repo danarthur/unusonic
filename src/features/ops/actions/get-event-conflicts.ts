@@ -87,6 +87,14 @@ export async function getEventConflicts(eventId: string): Promise<GetEventConfli
     project_id: string | null;
   };
 
+  /*
+    An event with no project cannot be checked against this workspace, so it
+    has no conflicts to report. Asking anyway is worse than not asking:
+    `.eq('id', null)` becomes `id=eq.null` in PostgREST, which matches nothing
+    and looks exactly like "this project is in another workspace".
+  */
+  if (!curr.project_id) return { conflicts: [] };
+
   const { data: project } = await supabase
     .schema('ops')
     .from('projects')

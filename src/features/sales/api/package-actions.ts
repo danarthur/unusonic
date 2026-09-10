@@ -9,6 +9,8 @@ import { createClient } from '@/shared/api/supabase/server';
 import type { Package } from '@/types/supabase';
 import { generateAndUpsertEmbedding } from './catalog-embeddings';
 import { observeUpsert } from '@/app/api/aion/lib/embeddings';
+import type { TablesUpdate } from '@/types/supabase';
+import type { Json } from '@/types/supabase';
 
 // NOTE: do NOT re-export `Package` from this 'use server' file.
 // Next 16's server-action bundler produces a value-level re-export for
@@ -269,7 +271,8 @@ export async function createPackage(
       is_draft: input.is_draft === true,
       is_taxable: input.is_taxable ?? true,
       image_url: input.image_url?.trim() || null,
-      definition: input.definition ?? null,
+      // A structured domain type on its way into a JSONB column.
+      definition: (input.definition ?? null) as unknown as Json,
       unit_type: input.unit_type ?? 'flat',
       unit_multiplier: input.unit_multiplier != null && Number.isFinite(Number(input.unit_multiplier)) && Number(input.unit_multiplier) > 0 ? Number(input.unit_multiplier) : 1,
     })
@@ -303,7 +306,7 @@ export async function updatePackage(
   input: UpdatePackageInput
 ): Promise<UpdatePackageResult> {
   const supabase = await createClient();
-  const updates: Record<string, unknown> = {};
+  const updates: TablesUpdate<'packages'> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() ?? null;
   if (input.category !== undefined) updates.category = input.category;
@@ -336,7 +339,7 @@ export async function updatePackage(
     const v = input.buffer_days != null && Number.isFinite(Number(input.buffer_days)) && Number(input.buffer_days) >= 0 ? Math.max(0, Math.floor(Number(input.buffer_days))) : 0;
     updates.buffer_days = v;
   }
-  if (input.definition !== undefined) updates.definition = input.definition;
+  if (input.definition !== undefined) updates.definition = input.definition as unknown as Json;
   if (input.is_taxable !== undefined) updates.is_taxable = input.is_taxable;
   if (input.image_url !== undefined) updates.image_url = input.image_url?.trim() || null;
   if (input.is_draft !== undefined) updates.is_draft = input.is_draft === true;

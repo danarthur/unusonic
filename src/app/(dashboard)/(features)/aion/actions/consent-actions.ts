@@ -375,7 +375,7 @@ export async function reviewFeatureRequest(
     .rpc('review_feature_request', {
       p_request_id: requestId,
       p_decision: decision,
-      p_note: note ?? null,
+      p_note: note ?? undefined,
     });
   if (error) return { success: false, error: error.message };
 

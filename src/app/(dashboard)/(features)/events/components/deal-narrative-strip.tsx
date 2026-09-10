@@ -54,7 +54,7 @@ export function DealNarrativeStrip({ dealId, className }: DealNarrativeStripProp
         'border border-[oklch(1_0_0_/_0.06)]',
         className ?? '',
       ].filter(Boolean).join(' ')}
-      style={{ borderRadius: 'var(--stage-radius-card, 10px)' }}
+      style={{ borderRadius: 'var(--stage-radius-panel)' }}
     >
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-wide text-[var(--stage-text-tertiary)]">

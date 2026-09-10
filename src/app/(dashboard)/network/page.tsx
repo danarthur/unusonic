@@ -14,6 +14,7 @@ import { NetworkDetailSheetWithSuspense } from '@/widgets/network-detail';
 import { NetworkOrbitWithGenesis } from './NetworkOrbitWithGenesis';
 import { NetworkGenesisNoOrg } from './NetworkGenesisNoOrg';
 import { SetCommandPaletteOrg } from './SetCommandPaletteOrg';
+import { VisibleOrderProvider } from '@/widgets/network-stream/model/visible-order';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,7 @@ async function NetworkPageInner({ searchParams }: PageProps) {
   const orgName = org?.name ?? null;
 
   return (
+    <VisibleOrderProvider>
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-6">
       <PersistOrgCookie orgId={currentOrgId} />
       <SetCommandPaletteOrg orgId={currentOrgId} />
@@ -126,5 +128,6 @@ async function NetworkPageInner({ searchParams }: PageProps) {
         />
       )}
     </div>
+    </VisibleOrderProvider>
   );
 }

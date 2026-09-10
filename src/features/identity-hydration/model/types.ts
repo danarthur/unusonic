@@ -101,11 +101,6 @@ export interface OnboardingState {
     fullName: string;
     avatarUrl: string | null;
   };
-  workspace: {
-    mode: 'create' | 'join' | null;
-    name: string;
-    inviteCode: string;
-  };
   integrations: {
     quickbooksConnected: boolean;
   };

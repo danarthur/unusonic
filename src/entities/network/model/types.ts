@@ -41,8 +41,7 @@ export type NetworkNode = {
     /** Entity type from directory.entities.type — used to pick correct avatar icon */
     entityType?: 'person' | 'company' | 'venue' | 'couple';
   };
-  /** Grouping key for the Crew zone — derived from job_title or first skill tag. Null renders under "Other". */
-  roleGroup?: string | null;
+
   /**
    * Whether the CURRENT user has starred this entity. Personal and silent --
    * colleagues do not see it, and it never affects category membership. The
@@ -78,10 +77,25 @@ export type NetworkNode = {
     tags?: string[];
     doNotRebook?: boolean;
     archived?: boolean;
-    /** Outstanding invoice balance for external_partner nodes. Only set when > 0. */
+    /**
+     * What they owe us: unsettled invoices billed to them. Only set when > 0.
+     *
+     * Never netted against `payable_balance`. One signed number would mean
+     * opposite things for a client and for a freelancer with nothing on screen
+     * to say which, which is the mistake the panel's old ledger made.
+     */
     outstanding_balance?: number;
+    /** What we owe them: expenses recorded against them and not yet paid. */
+    payable_balance?: number;
     /** ISO date string from cortex.relationships.created_at — when this connection was established. */
     connectedSince?: string;
+    /**
+     * What this person costs to book, before any one show.
+     *
+     * "What do they cost" is the second question when staffing, right after
+     * "are they free" -- and before this it lived only in the text of a note.
+     */
+    rate?: { amount: number; unit: string | null } | null;
     /** W-9 on file — populated for person (roster member) nodes. */
     w9_status?: boolean | null;
     /** COI expiry ISO date string — populated for person (roster member) nodes. */
@@ -94,6 +108,29 @@ export type NetworkNode = {
     referral_count?: number;
     /** Business function capabilities from ops.entity_capabilities. */
     capabilities?: string[];
+    /**
+     * Most recent show already worked with this entity, ISO date.
+     *
+     * The standing signal the contacts page is actually opened for. Distinct
+     * from `connectedSince`, which is when the row was created and never
+     * changes -- tenure is a profile fact, recency is a scanning fact.
+     */
+    lastWorked?: string | null;
+    /** Next show ahead, ISO date. Null when nothing is on the books. */
+    nextBooked?: string | null;
+    /**
+     * Whether `nextBooked` is a scheduled event rather than a proposed deal
+     * date. A proposal is not a booking and the card must not imply it is.
+     */
+    nextConfirmed?: boolean;
+    /**
+     * Where this entity is, as "Napa, CA" or "Nashville".
+     *
+     * Load-bearing for venues above almost everything else -- a venue card used
+     * to render a MapPin icon, a picture of the concept of location, exactly
+     * where the location belonged.
+     */
+    region?: string | null;
   };
 };
 

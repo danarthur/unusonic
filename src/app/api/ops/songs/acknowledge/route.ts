@@ -80,16 +80,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .eq('id', input.eventId)
     .maybeSingle();
 
-  if (!eventRow) {
+  // `workspace_id` is nullable on ops.events, and every audit line written
+  // below is scoped by it. An event that is in no workspace is not one this
+  // route can act on or account for.
+  if (!eventRow?.workspace_id) {
     return NextResponse.json({ ok: false, reason: 'event_not_found' }, { status: 404 });
   }
+  const workspaceId = eventRow.workspace_id;
 
   // --- Call the RPC as authenticated ---
    
   const { data, error } = await supabase.rpc('ops_songs_acknowledge_client_request', {
     p_event_id: input.eventId,
     p_entry_id: input.entryId,
-    p_moment_label: input.momentLabel ?? null,
+    p_moment_label: input.momentLabel ?? undefined,
   });
 
   const row = Array.isArray(data) ? data[0] : data;
@@ -98,7 +102,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const reason = error?.message ?? row?.reason ?? 'unknown_error';
     await logAccess({
       entityId: eventRow.client_entity_id ?? user.id,
-      workspaceId: eventRow.workspace_id,
+      workspaceId,
       resourceType: 'song_request',
       resourceId: input.entryId,
       action: 'song_acknowledge',
@@ -124,7 +128,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   await logAccess({
     entityId: eventRow.client_entity_id ?? user.id,
-    workspaceId: eventRow.workspace_id,
+    workspaceId,
     resourceType: 'song_request',
     resourceId: input.entryId,
     action: 'song_acknowledge',

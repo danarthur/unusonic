@@ -48,7 +48,7 @@ export function VenueSpecsCompactCard({ workspaceId, entityId }: VenueSpecsCompa
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STAGE_LIGHT}
-      className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 space-y-3"
+      className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)] space-y-3"
       data-surface="elevated"
     >
       <h3 className="stage-label text-[var(--stage-text-secondary)]">Venue specs</h3>
@@ -61,26 +61,63 @@ export function VenueSpecsCompactCard({ workspaceId, entityId }: VenueSpecsCompa
         {rows.map((row) => (
           <div key={row.key} className="flex items-start gap-2">
             <row.Icon
-              className="size-3.5 shrink-0 mt-0.5 text-[var(--stage-text-tertiary)]"
+              className="size-3.5 shrink-0 mt-0.5 text-[var(--stage-text-secondary)]"
               strokeWidth={1.5}
             />
             <div className="min-w-0">
-              <dt className="stage-label text-[var(--stage-text-tertiary)]">
+              <dt className="stage-label text-[var(--stage-text-secondary)]">
                 {row.label}
               </dt>
-              <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)] leading-snug tabular-nums">
+              <dd className="stage-readout leading-snug">
                 {row.value}
               </dd>
               {row.sub && (
-                <p className="text-[11px] text-[var(--stage-text-tertiary)] mt-0.5">
+                <p className="text-[11px] text-[var(--stage-text-secondary)] mt-0.5">
                   {row.sub}
                 </p>
               )}
+              <ConfirmedOn iso={specs.confirmedOn[ATTR_BY_ROW[row.key] ?? '']} />
             </div>
           </div>
         ))}
       </dl>
     </motion.div>
+  );
+}
+
+/**
+ * Which stored attribute each row came from, so a row can show when its fact
+ * was last confirmed. Rows with no entry are ones capture never dates.
+ */
+const ATTR_BY_ROW: Record<string, string> = {
+  capacity: 'capacity',
+  'load-in': 'load_in_notes',
+  curfew: 'curfew',
+  power: 'power_notes',
+  parking: 'parking_notes',
+  dock: 'dock_address',
+  access: 'access_notes',
+};
+
+/** "Aug '24" — short enough to sit under a value without competing with it. */
+function confirmedLabel(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+  return `confirmed ${month} '${String(d.getUTCFullYear()).slice(2)}`;
+}
+
+/**
+ * A venue fact with no date is one you cannot act on. Rooms change hands, get
+ * renovated, and get limiters fitted after a noise complaint, so the date is
+ * what tells you whether to ring and check.
+ */
+function ConfirmedOn({ iso }: { iso: string | undefined }) {
+  const label = confirmedLabel(iso);
+  if (!label) return null;
+  return (
+    <p className="mt-0.5 stage-badge-text text-[var(--stage-text-tertiary)]">{label}</p>
   );
 }
 

@@ -66,16 +66,41 @@ export function rolesOf(node: NetworkNode): RoleEdge[] {
   return [];
 }
 
+/**
+ * Which category a PARTNER edge puts someone in.
+ *
+ * PARTNER is a documented catch-all: summonPartner writes it for freelance
+ * people and for partner companies alike, so it cannot decide this alone. A
+ * company is never someone you put on a job, and a person on a PARTNER edge
+ * and nothing else is the freelancer pattern that summonPersonGhost writes.
+ *
+ * The case this exists for is a person holding BOTH: a client or a vendor who
+ * also carries a partner edge. Those were landing in the roster as well as
+ * their real category -- so a coordinator who hires you, or a client, appeared
+ * in your own crew. The outward-facing role is the true one, and PARTNER
+ * alongside it adds nothing, so it contributes no category rather than
+ * inventing a second one.
+ *
+ * Deliberately not keyed on tier or gravity. Those are preference axes and must
+ * not move anyone between categories.
+ */
+function partnerCategory(node: NetworkNode, roles: RoleEdge[]): NetworkCategory | null {
+  if (node.identity.entityType !== 'person') return 'vendors';
+
+  const worksWithUs = roles.some(
+    (r) => r === 'CLIENT' || r === 'VENDOR' || r === 'VENUE_PARTNER',
+  );
+  return worksWithUs ? null : 'roster';
+}
+
 export function categoriesOf(node: NetworkNode): NetworkCategory[] {
   const roles = rolesOf(node);
 
   const out = new Set<NetworkCategory>();
   for (const role of roles) {
     if (role === 'PARTNER') {
-      // A company you partner with is a business relationship, not a person you
-      // can staff a show with. People default to roster; companies to vendors,
-      // which is closer to true than roster and avoids a fifth category.
-      out.add(node.identity.entityType === 'person' ? 'roster' : 'vendors');
+      const partnerCat = partnerCategory(node, roles);
+      if (partnerCat) out.add(partnerCat);
       continue;
     }
     const cat = ROLE_TO_CATEGORY[role];
@@ -103,4 +128,63 @@ export function isInCategory(node: NetworkNode, category: NetworkCategory): bool
  */
 export function isUnsorted(node: NetworkNode): boolean {
   return categoriesOf(node).length === 0;
+}
+
+// ─── Employment grouping ─────────────────────────────────────────────────────
+
+export type EmploymentGroup = 'staff' | 'freelance';
+
+/**
+ * Employed by us, or booked by us.
+ *
+ * The distinction people actually hold in their heads about their own crew, and
+ * the one the section was hiding. It is deliberately NOT a category: every
+ * workforce product studied — Workday, Rippling, Deel, Gusto, Wrapbook,
+ * Bullhorn — treats employment type as a field surfaced as a grouping or a
+ * filter, never as a separate list. The superordinate noun is always Worker;
+ * employee is the subtype, never the container.
+ *
+ * That matters beyond tidiness. Moving a person between categories is the
+ * expensive, near-irreversible operation everywhere it is published —
+ * QuickBooks cannot do it at all, Salesforce cannot undo it, Workday's
+ * "convert" terminates and re-hires. A freelancer who becomes staff should
+ * change a group, not move house.
+ *
+ * `extended_team` and `external_partner` are the same thing arriving by
+ * different doors: a contractor added to the roster, and a freelancer added
+ * through "crew" in the add-connection sheet. The edge differs, the person's
+ * relationship to the company does not, so they group together.
+ */
+export function employmentGroupOf(node: NetworkNode): EmploymentGroup {
+  return node.kind === 'internal_employee' ? 'staff' : 'freelance';
+}
+
+export const EMPLOYMENT_GROUP_LABELS: Record<EmploymentGroup, string> = {
+  staff: 'Staff',
+  freelance: 'Freelance',
+};
+
+/** Staff first, then freelance. Both omitted when only one kind is present. */
+export const EMPLOYMENT_GROUP_ORDER: EmploymentGroup[] = ['staff', 'freelance'];
+
+/**
+ * Split a list into employment groups, keeping the incoming order within each.
+ *
+ * Returns a single unlabelled group when everybody is the same kind: a heading
+ * over the whole list names nothing, and a company whose crew is entirely
+ * freelance should not be told so on every visit.
+ */
+export function byEmployment(
+  nodes: NetworkNode[],
+): { group: EmploymentGroup | null; nodes: NetworkNode[] }[] {
+  const staff = nodes.filter((n) => employmentGroupOf(n) === 'staff');
+  const freelance = nodes.filter((n) => employmentGroupOf(n) === 'freelance');
+
+  if (staff.length === 0 || freelance.length === 0) {
+    return [{ group: null, nodes }];
+  }
+  return [
+    { group: 'staff', nodes: staff },
+    { group: 'freelance', nodes: freelance },
+  ];
 }

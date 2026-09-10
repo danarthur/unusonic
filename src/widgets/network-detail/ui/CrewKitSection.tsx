@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wrench, Plus, X, ChevronDown, Link2, CheckCircle2, Clock, AlertCircle, Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,6 +55,38 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+
+  /**
+   * Anchor the portaled dropdown to the input, flipping above it when there is
+   * not enough room below. Recomputed on open and on scroll/resize, because the
+   * anchor moves inside a scrolling sheet while the portal does not.
+   */
+  useEffect(() => {
+    if (!showDropdown) return;
+
+    const place = () => {
+      const el = dropdownRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const MAX_H = 168;
+      const below = window.innerHeight - r.bottom;
+      const flip = below < MAX_H && r.top > below;
+      setDropdownStyle(
+        flip
+          ? { left: r.left, width: r.width, bottom: window.innerHeight - r.top + 4 }
+          : { left: r.left, width: r.width, top: r.bottom + 4 },
+      );
+    };
+
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [showDropdown, catalogResults.length]);
 
   const fetchItems = useCallback(async () => {
     const data = await getCrewEquipmentForEntity(entityId);
@@ -126,7 +159,7 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
       setAddOpen(false);
       await fetchItems();
     } else {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
     }
   };
 
@@ -134,7 +167,7 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     const result = await removeCrewEquipment({ crew_equipment_id: id });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(result.error, { duration: Infinity });
       await fetchItems();
     }
   };
@@ -172,11 +205,11 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
   const handlePhotoUpload = useCallback(
     async (equipmentId: string, file: File) => {
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-        toast.error('Only PNG, JPEG, and WebP images are supported.');
+        toast.error('Only PNG, JPEG, and WebP images are supported.', { duration: Infinity });
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image must be under 5 MB.');
+        toast.error('Image must be under 5 MB.', { duration: Infinity });
         return;
       }
       setUploadingPhotoId(equipmentId);
@@ -195,7 +228,7 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
           prev.map((i) => (i.id === equipmentId ? { ...i, photo_url: result.photoUrl } : i))
         );
       } else {
-        toast.error(result.error);
+        toast.error(result.error, { duration: Infinity });
       }
     },
     []
@@ -217,7 +250,7 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
   if (loading) return null;
 
   return (
-    <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+    <div className="rounded-[var(--stage-radius-panel)] bg-[var(--ctx-card)] p-[var(--stage-padding)]" data-surface="elevated">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Wrench className="size-3.5 text-[var(--stage-text-secondary)]" strokeWidth={1.5} />
@@ -384,11 +417,17 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
                     <Link2 className="absolute right-2 top-1/2 -translate-y-1/2 size-3 text-[var(--color-unusonic-success)]" strokeWidth={1.5} />
                   )}
 
-                  {/* Typeahead dropdown */}
-                  {showDropdown && (
+                  {/*
+                    Portaled to document.body rather than positioned absolutely.
+                    The sheet panel sets overflow-hidden and its body scrolls, so
+                    an in-flow dropdown was clipped whenever this card sat low in
+                    the sheet -- the catalog matches simply could not be seen.
+                    CLAUDE.md rule 12.
+                  */}
+                  {showDropdown && createPortal(
                     <div
-                      className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-[var(--stage-edge-subtle)] shadow-lg overflow-hidden"
-                      style={{ background: 'var(--ctx-dropdown, var(--stage-surface-raised))' }}
+                      className="fixed z-[60] rounded-lg border border-[var(--stage-edge-subtle)] shadow-lg overflow-hidden"
+                      style={{ ...dropdownStyle, background: 'var(--ctx-dropdown, var(--stage-surface-raised))' }}
                     >
                       <div className="max-h-[160px] overflow-y-auto">
                         {catalogResults.map((match) => (
@@ -425,7 +464,8 @@ export function CrewKitSection({ entityId }: { entityId: string }) {
                           <p className="px-3 py-2 text-xs text-[var(--stage-text-tertiary)]">No catalog matches</p>
                         )}
                       </div>
-                    </div>
+                    </div>,
+                    document.body,
                   )}
                 </div>
               </div>

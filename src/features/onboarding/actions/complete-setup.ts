@@ -1,7 +1,12 @@
 /**
- * Unusonic Onboarding – Server-Side Event Orchestration (EDA)
- * initializeOrganization: Transaction + Async Triggers (Afterburner)
- * Creates workspace + directory.entities org + cortex ROSTER_MEMBER edge.
+ * Unusonic onboarding — creating the workspace.
+ *
+ * Workspace, org entity, owner person entity, ROSTER_MEMBER edge, membership,
+ * profile and agent config, all in one database transaction via
+ * `create_workspace_with_owner`. This file used to do those seven writes in
+ * sequence and undo them by hand; see the migration for why that produced an
+ * orphaned workspace in production.
+ *
  * @module features/onboarding/actions/complete-setup
  */
 
@@ -10,7 +15,6 @@
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
-import { getSystemClient } from '@/shared/api/supabase/system';
 import { revalidatePath } from 'next/cache';
 import type { UserPersona, SubscriptionTier } from '../model/subscription-types';
 import { getModulesForTier } from '../lib/get-modules-for-tier';
@@ -44,13 +48,12 @@ export interface InitializeOrganizationResult {
 }
 
 /**
- * Initialize Organization: Transaction
- * 1. Create Workspace (with subscription_tier + signalpay_enabled)
- * 2. Create directory.entities company (handle = slug)
- * 3. Create person entity (if missing) + ROSTER_MEMBER edge
- * 4. Add User as Owner (workspace_members)
- * 5. Update Profile (onboarding_completed)
- * 6. Create Agent Config
+ * Create the workspace and everything a workspace needs to exist, atomically.
+ *
+ * Safe to call twice: the RPC holds an advisory lock on the caller and returns
+ * the workspace they already own by that name rather than making a second one,
+ * which is what a double-click or an impatient refresh on a slow onboarding
+ * submit would otherwise do.
  *
  * NOTE on removed afterburners: earlier versions fired `triggerVectorEmbeddings`
  * on venue tiers and `registerAgent` on studio tiers. Both were stubs blocked on
@@ -71,180 +74,86 @@ export async function initializeOrganization(
   const name = input.name.trim();
   if (!name) return { success: false, error: 'Organization name is required' };
 
+  const personaMap: Record<OrganizationType, UserPersona> = {
+    solo: 'solo_professional',
+    agency: 'agency_team',
+    venue: 'venue_brand',
+  };
+  const persona = personaMap[input.type];
+  if (!persona) {
+    return { success: false, error: `Invalid organization type "${input.type}"` };
+  }
+
   const slug = slugify(name) || `org-${Date.now()}`;
 
-  // Use service-role client for writes so onboarding succeeds even when
-  // the session JWT is not forwarded to Postgres (Server Action cookie context).
-  const db = getSystemClient();
+  /*
+    One call, one transaction.
 
-  try {
-    // 1. Create Workspace (canonical source for subscription tier + billing flags)
-    // Try the clean slug first; only append a random suffix on collision
-    let finalSlug = slug;
-    const { count } = await db
-      .from('workspaces')
-      .select('id', { count: 'exact', head: true })
-      .eq('slug', slug);
-    if (count && count > 0) {
-      finalSlug = `${slug}-${Math.random().toString(36).slice(2, 8)}`;
-    }
+    This was six writes issued in sequence with hand-written compensation
+    between them, and the compensation had gone wrong: the owner's person
+    entity is created with `owner_workspace_id` pointing at the new workspace,
+    but the rollback after a failed `workspace_members` insert deleted only the
+    org entity before trying to delete the workspace. `directory.entities`
+    references workspaces with no ON DELETE, so that delete raised a foreign
+    key violation -- and its result was discarded. The caller was told setup
+    failed while the workspace stayed behind, owned by nobody.
 
-    const { data: workspace, error: wsError } = await db
-      .from('workspaces')
-      .insert({
-        name,
-        slug: finalSlug,
-        subscription_tier: input.subscriptionTier,
-        signalpay_enabled: input.unusonicPayEnabled ?? false,
-      })
-      .select('id')
-      .single();
+    Postgres already does all-or-nothing. The RPC uses it, so there is no
+    compensation left to get wrong, and it takes an advisory lock on the caller
+    so a double submit returns the workspace they already have.
 
-    if (wsError || !workspace) {
-      return { success: false, error: wsError?.message ?? 'Failed to create workspace' };
-    }
+    Read the profile name here rather than inside the function: the RPC runs as
+    its definer and should not be deciding what to call anybody.
+  */
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .maybeSingle();
 
-    // 2. Create directory.entities company (replaces commercial_organizations)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- directory schema not in generated types for service-role client
-    const dirDb = db.schema('directory');
-    const { data: orgEntity, error: orgError } = await dirDb
-      .from('entities')
-      .insert({
-        display_name: name,
-        handle: finalSlug,
-        type: 'company',
-        owner_workspace_id: workspace.id,
-        attributes: {
-          is_ghost: false,
-          is_claimed: true,
-          organization_type: input.type,
-          pms_integration_enabled: input.pmsIntegrationEnabled ?? false,
-        },
-      })
-      .select('id')
-      .single();
+  const { data, error } = await supabase.rpc('create_workspace_with_owner', {
+    p_name: name,
+    p_slug: slug,
+    p_organization_type: input.type,
+    p_subscription_tier: input.subscriptionTier,
+    p_persona: persona,
+    p_owner_display_name: profile?.full_name ?? user.email ?? 'Owner',
+    p_owner_email: user.email ?? '',
+    p_signalpay_enabled: input.unusonicPayEnabled ?? false,
+    p_pms_integration_enabled: input.pmsIntegrationEnabled ?? false,
+    p_modules_enabled: getModulesForTier(input.subscriptionTier),
+  });
 
-    if (orgError || !orgEntity) {
-      await db.from('workspaces').delete().eq('id', workspace.id);
-      return { success: false, error: orgError?.message ?? 'Failed to create organization' };
-    }
-
-    // 3. Get or create person entity for the user + ROSTER_MEMBER edge
-    const { data: existingPerson } = await dirDb
-      .from('entities')
-      .select('id')
-      .eq('claimed_by_user_id', user.id)
-      .eq('type', 'person')
-      .maybeSingle();
-
-    let personId = (existingPerson as { id: string } | null)?.id ?? null;
-    if (!personId) {
-      const { data: profile } = await db
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const { data: newPerson, error: personErr } = await dirDb
-        .from('entities')
-        .insert({
-          display_name: (profile as { full_name?: string | null } | null)?.full_name ?? user.email ?? 'Owner',
-          type: 'person',
-          claimed_by_user_id: user.id,
-          owner_workspace_id: workspace.id,
-          attributes: { email: user.email ?? '', is_ghost: false },
-        })
-        .select('id')
-        .single();
-
-      if (personErr || !newPerson) {
-        await dirDb.from('entities').delete().eq('id', (orgEntity as { id: string }).id);
-        await db.from('workspaces').delete().eq('id', workspace.id);
-        return { success: false, error: personErr?.message ?? 'Failed to create person entity' };
-      }
-      personId = (newPerson as { id: string }).id;
-    }
-
-    const orgId = (orgEntity as { id: string }).id;
-
-    // Create ROSTER_MEMBER edge (person → org) via RPC
-    const { error: relError } = await db.rpc('upsert_relationship', {
-      p_source_entity_id: personId,
-      p_target_entity_id: orgId,
-      p_type: 'ROSTER_MEMBER',
-      p_context_data: { role: 'owner', employment_status: 'internal_employee' },
-    });
-
-    if (relError) {
-      console.warn('[Onboarding] ROSTER_MEMBER edge failed (non-fatal):', relError.message);
-      Sentry.captureMessage('Onboarding ROSTER_MEMBER edge failed', {
-        level: 'warning',
-        extra: { userId: user.id, orgId, workspaceId: workspace.id, error: relError.message },
-      });
-      // Non-fatal — workspace_members is the primary membership. Edge is for graph queries.
-    }
-
-    // 4. Add User as Owner (workspace_members — primary membership table)
-    const { error: wmError } = await db.from('workspace_members').insert({
-      workspace_id: workspace.id,
-      user_id: user.id,
-      role: 'owner',
-    });
-
-    if (wmError) {
-      await dirDb.from('entities').delete().eq('id', orgId);
-      await db.from('workspaces').delete().eq('id', workspace.id);
-      return { success: false, error: `Workspace member: ${wmError.message}` };
-    }
-
-    // 5. Update Profile (onboarding_completed)
-    const personaMap: Record<OrganizationType, UserPersona> = {
-      solo: 'solo_professional',
-      agency: 'agency_team',
-      venue: 'venue_brand',
-    };
-    const persona = personaMap[input.type];
-    if (!persona) {
-      // Defensive: callers must pass a valid OrganizationType. Roll back rather than
-      // upsert an undefined persona that would break agent_configs + role routing.
-      await dirDb.from('entities').delete().eq('id', orgId);
-      await db.from('workspace_members').delete().eq('workspace_id', workspace.id).eq('user_id', user.id);
-      await db.from('workspaces').delete().eq('id', workspace.id);
-      return { success: false, error: `Invalid organization type "${input.type}"` };
-    }
-
-    await db.from('profiles').update({
-      onboarding_completed: true,
-      onboarding_step: 3,
-      persona,
-    }).eq('id', user.id);
-
-    // 6. Create Agent Config (workspace_id only — no legacy organization_id)
-    await db.from('agent_configs').insert({
-      workspace_id: workspace.id,
-      persona,
-      tier: input.subscriptionTier,
-      xai_reasoning_enabled: true,
-      agent_mode: input.subscriptionTier === 'studio' ? 'autonomous' : 'assist',
-      modules_enabled: getModulesForTier(input.subscriptionTier),
-    });
-
-    revalidatePath('/');
-
-    // Client navigates via router.push(result.redirectPath) — server action
-    // can't throw NEXT_REDIRECT here because it's awaited inside useActionState.
-    return {
-      success: true,
-      organizationId: orgId,
-      workspaceId: workspace.id,
-      redirectPath: '/',
-      finalSlug,
-    };
-  } catch (e) {
-    console.error('[Onboarding] initializeOrganization:', e);
-    Sentry.captureException(e, { tags: { area: 'onboarding' } });
-    return { success: false, error: e instanceof Error ? e.message : 'Setup failed' };
+  if (error) {
+    console.error('[Onboarding] create_workspace_with_owner:', error.message);
+    Sentry.captureException(error, { tags: { area: 'onboarding' } });
+    return { success: false, error: error.message };
   }
+
+  const result = data as {
+    ok?: boolean;
+    error?: string;
+    workspace_id?: string;
+    org_entity_id?: string;
+    slug?: string;
+    already_existed?: boolean;
+  } | null;
+
+  if (!result?.ok || !result.workspace_id) {
+    return { success: false, error: result?.error ?? 'Setup failed' };
+  }
+
+  revalidatePath('/');
+
+  // Client navigates via router.push(result.redirectPath) — server action
+  // can't throw NEXT_REDIRECT here because it's awaited inside useActionState.
+  return {
+    success: true,
+    organizationId: result.org_entity_id,
+    workspaceId: result.workspace_id,
+    redirectPath: '/',
+    finalSlug: result.slug ?? slug,
+  };
 }
 
 // Redirect path resolution removed — middleware handles all role-based routing via /.

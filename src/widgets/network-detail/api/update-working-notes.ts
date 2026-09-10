@@ -23,6 +23,8 @@ import type {
   WorkingNotesChannel,
   WorkingNotesDnrReason,
 } from './get-working-notes';
+import { PRIVATE_NOTES_MAX, privateNotesTooLong } from '../model/working-notes-limits';
+import { workingNotesRpcArgs } from '../model/working-notes-args';
 
 export type UpdateWorkingNotesPatch = {
   communicationStyle?: string | null;
@@ -32,7 +34,11 @@ export type UpdateWorkingNotesPatch = {
     note?: string | null;
   };
   preferredChannel?: WorkingNotesChannel | '' | null;
+  /** Free text kept about the contact. '' clears it, as with every field here. */
+  privateNotes?: string | null;
 };
+
+
 
 export type UpdateWorkingNotesResult =
   | { ok: true }
@@ -43,23 +49,22 @@ export async function updateWorkingNotes(
   entityId: string,
   patch: UpdateWorkingNotesPatch,
 ): Promise<UpdateWorkingNotesResult> {
+  if (privateNotesTooLong(patch.privateNotes)) {
+    return { ok: false, error: `Notes are limited to ${PRIVATE_NOTES_MAX} characters.` };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Unauthorized.' };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await supabase
     .schema('directory')
     .rpc('upsert_entity_working_notes', {
       p_workspace_id: workspaceId,
       p_entity_id: entityId,
-      p_communication_style: patch.communicationStyle ?? null,
-      p_dnr_flagged: patch.dnr?.flagged ?? null,
-      p_dnr_reason: patch.dnr?.reason ?? null,
-      p_dnr_note: patch.dnr?.note ?? null,
-      p_preferred_channel: patch.preferredChannel ?? null,
+      ...workingNotesRpcArgs(patch),
       p_source: 'manual',
     });
 

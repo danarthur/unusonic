@@ -26,6 +26,7 @@ import {
   type EntityAddress,
 } from '@/shared/lib/entity-address';
 import { QUICK_EDIT_FIELDS, type QuickEditKind, type QuickEditData } from './quick-edit-fields';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 /** directory.entities.type → the editor shape we render. */
 function toKind(entityType: string | null | undefined): QuickEditKind | null {
@@ -89,7 +90,7 @@ function splitQuickEditValues(
   kind: QuickEditKind,
   values: Record<string, string>,
 ): { patch: Record<string, unknown>; addressEdits: Record<string, string> } {
-  const patch: Record<string, unknown> = {};
+  const patch: JsonObject = {};
   const addressEdits: Record<string, string> = {};
 
   for (const f of QUICK_EDIT_FIELDS[kind]) {
@@ -168,9 +169,12 @@ export async function saveEntityQuickEdit(
     return { ok: false, error: 'Those values are not valid for this record.' };
   }
 
+  // `parsed.data`, not `patch`: the validated output is what was checked, and
+  // sending the raw input would let an unvalidated key through the schema that
+  // was just run on it.
   const { error } = await supabase.rpc('patch_entity_attributes', {
     p_entity_id: entityId,
-    p_attributes: patch,
+    p_attributes: parsed.data as JsonObject,
   });
   if (error) return { ok: false, error: error.message };
 

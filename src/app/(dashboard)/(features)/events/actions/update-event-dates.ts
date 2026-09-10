@@ -41,7 +41,10 @@ export async function updateEventDates(
     .from('events')
     .update({
       starts_at: new Date(startsAt).toISOString(),
-      ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+      // `ends_at` is not nullable. Omitting it leaves the existing end in
+      // place, which is what "no new end time was given" means -- writing null
+      // would have been rejected by the column anyway.
+      ...(endsAt ? { ends_at: new Date(endsAt).toISOString() } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', eventId)

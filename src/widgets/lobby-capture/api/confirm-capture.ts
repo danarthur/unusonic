@@ -29,6 +29,9 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/shared/api/supabase/server';
 import { syncCaptureToMemory } from '@/app/api/aion/lib/capture-memory-sync';
 import type { CaptureParseResult } from '@/app/api/aion/capture/parse/route';
+import { readEntityAttrs } from '@/shared/lib/entity-attrs';
+import { decideVenueFact, normaliseFact } from './venue-facts';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 export type CaptureVisibility = 'user' | 'workspace';
 
@@ -77,6 +80,99 @@ export type ConfirmCaptureResult =
  * Phase 2 — read current working notes, upsert ONLY fields that are currently
  * null. The user's manual entries are sacred; Aion fills the empty slots.
  */
+/**
+ * Record what a person costs, when nothing is on file yet.
+ *
+ * Reads the existing attributes through the typed reader and patches back
+ * through patch_entity_attributes, which merges rather than replaces -- writing
+ * the blob wholesale would drop every other attribute on the entity.
+ */
+async function autoFillRate(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.rpc() are used.
+  supabase: any,
+  entityId: string,
+  rate: NonNullable<CaptureParseResult['rate']>,
+): Promise<void> {
+  if (!Number.isFinite(rate.amount) || rate.amount <= 0) return;
+
+  const { data: row } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('attributes')
+    .eq('id', entityId)
+    .maybeSingle();
+
+  const attrs = readEntityAttrs((row as { attributes: unknown } | null)?.attributes, 'person');
+  if (attrs.rate_amount != null) return;
+
+  const patch: Record<string, unknown> = { rate_amount: rate.amount };
+  const unit = rate.unit?.trim();
+  if (unit) patch.rate_unit = unit;
+  const note = rate.note?.trim();
+  if (note) patch.rate_note = note;
+
+  await supabase.schema('directory').rpc('patch_entity_attributes', {
+    p_entity_id: entityId,
+    p_attributes: patch,
+  });
+}
+
+/**
+ * Land spoken venue facts in the spec fields.
+ *
+ * A venue's standing facts have a fixed shape, because the same questions get
+ * asked at every venue every time: how do I get in, where do I park, where is
+ * power, when do I have to stop. That makes them a form being filled in over
+ * years, one voice note at a time -- not a list. A form can show what is still
+ * missing; a list of notes never can.
+ *
+ * Fill-only, with one addition: hearing a fact that already matches what is on
+ * file re-stamps its date. Venues go stale in specific ways -- new management,
+ * a renovation, a limiter fitted after a noise complaint -- so "confirmed Aug
+ * '24" is the difference between a spec you act on and one you ring to check.
+ *
+ * A spoken value that CONTRADICTS what is stored is deliberately not written.
+ * Sending someone to the wrong dock on a misheard sentence is worse than
+ * missing an update, and changing a spec stays a deliberate edit.
+ */
+async function autoFillVenueFacts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the server client's generics vary; only .schema()/.rpc() are used.
+  supabase: any,
+  entityId: string,
+  facts: NonNullable<CaptureParseResult['venue_facts']>,
+): Promise<void> {
+  const { data: row } = await supabase
+    .schema('directory')
+    .from('entities')
+    .select('attributes')
+    .eq('id', entityId)
+    .maybeSingle();
+
+  const attrs = readEntityAttrs((row as { attributes: unknown } | null)?.attributes, 'venue');
+  const current = attrs as unknown as Record<string, unknown>;
+  const confirmedOn = { ...((attrs.specs_confirmed as Record<string, string> | null) ?? {}) };
+  const today = new Date().toISOString().slice(0, 10);
+
+  const patch: Record<string, unknown> = {};
+  let touched = false;
+
+  for (const [key, spoken] of Object.entries(facts)) {
+    const outcome = decideVenueFact(spoken, current[key]);
+    if (outcome === 'skip') continue;
+    if (outcome === 'fill') patch[key] = normaliseFact(spoken);
+    confirmedOn[key] = today;
+    touched = true;
+  }
+
+  if (!touched) return;
+
+  patch.specs_confirmed = confirmedOn;
+  await supabase.schema('directory').rpc('patch_entity_attributes', {
+    p_entity_id: entityId,
+    p_attributes: patch,
+  });
+}
+
 async function autoFillWorkingNotes(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceId: string,
@@ -102,7 +198,6 @@ async function autoFillWorkingNotes(
   // Build the patch: only include fields that are empty today and have a signal.
   const patch: {
     p_communication_style?: string;
-    p_dnr_flagged?: boolean;
     p_dnr_reason?: string;
     p_dnr_note?: string;
     p_preferred_channel?: string;
@@ -113,8 +208,21 @@ async function autoFillWorkingNotes(
     patch.p_communication_style = trimmedCommStyle;
   }
 
-  if (signals.dnr_reason && !current?.dnr_flagged) {
-    patch.p_dnr_flagged = true;
+  /*
+    A capture does not raise do-not-rebook.
+
+    It used to: an LLM-extracted `dnr_reason` set `dnr_flagged = true` outright,
+    on the same code path that is forbidden from writing a private note. The
+    risk ordering was backwards. A wrong sentence in a notes field is
+    embarrassing and editable; a wrong "never book this person again" on a
+    freelancer is their livelihood, and it renders as a warning chip on their
+    record and feeds the state chip on the card.
+
+    The reason and note are still captured, so nothing the model noticed is
+    lost -- they land as an unflagged suggestion an owner can act on from the
+    "How to handle" card. Only the flag itself now needs a person.
+  */
+  if (signals.dnr_reason && !current?.dnr_flagged && !current?.dnr_reason) {
     patch.p_dnr_reason = signals.dnr_reason;
     const note = signals.dnr_note?.trim();
     if (note) patch.p_dnr_note = note;
@@ -128,16 +236,30 @@ async function autoFillWorkingNotes(
   if (Object.keys(patch).length === 0) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.schema('directory').rpc('upsert_entity_working_notes', {
+  const { data: wrote, error: notesErr } = await supabase.schema('directory').rpc('upsert_entity_working_notes', {
     p_workspace_id: workspaceId,
     p_entity_id: entityId,
-    p_communication_style: patch.p_communication_style ?? null,
-    p_dnr_flagged: patch.p_dnr_flagged ?? null,
-    p_dnr_reason: patch.p_dnr_reason ?? null,
-    p_dnr_note: patch.p_dnr_note ?? null,
-    p_preferred_channel: patch.p_preferred_channel ?? null,
+    p_communication_style: patch.p_communication_style ?? undefined,
+    p_dnr_reason: patch.p_dnr_reason ?? undefined,
+    p_dnr_note: patch.p_dnr_note ?? undefined,
+    p_preferred_channel: patch.p_preferred_channel ?? undefined,
     p_source: 'capture',
   });
+
+  /*
+    The result is checked. This RPC returns FALSE rather than raising when it
+    refuses -- wrong workspace, unowned entity, a value outside a closed list --
+    and the call used to be a bare `await`, so a refusal was indistinguishable
+    from a write. That is the silent-write defect this branch exists to end,
+    and it was sitting in the branch's own capture path.
+  */
+  if (notesErr || wrote === false) {
+    console.warn('[capture] working-notes auto-fill refused', {
+      workspaceId,
+      entityId,
+      reason: notesErr?.message ?? 'rpc returned false',
+    });
+  }
 }
 
 function splitName(name: string): { first: string; last: string | null } {
@@ -162,7 +284,7 @@ async function createGhostFromParse(
   const trimmed = name.trim();
   if (!trimmed) return { error: 'Name is required.' };
 
-  const attributes: Record<string, unknown> = {
+  const attributes: JsonObject = {
     is_ghost: true,
     from_capture: true,
   };
@@ -275,6 +397,13 @@ export async function confirmCapture(
   const linkedDealId = finalLink?.kind === 'deal' ? finalLink.id : null;
   const linkedEventId = finalLink?.kind === 'event' ? finalLink.id : null;
 
+  // Where the note gets filed. Only meaningful with a production attached --
+  // "true for that one show" says nothing when there is no show -- and the RPC
+  // drops a dangling 'show' for the same reason. Null lands on the profile,
+  // which is the safe direction: noise there is visible and gets fixed in a
+  // tap, while a wrongly demoted note is invisible and never gets corrected.
+  const noteScope = finalLink ? parse.note_scope : null;
+
   // ── Persist the capture row ──────────────────────────────────────────────
   // cortex RPCs must be called with explicit .schema('cortex') — the default
   // schema is public and this function only exists in cortex.
@@ -286,13 +415,15 @@ export async function confirmCapture(
       p_transcript: transcript,
       p_parsed_entity: parse.entity ?? null,
       p_parsed_follow_up: finalFollowUp ?? null,
-      p_parsed_note: finalNote && finalNote.length > 0 ? finalNote : null,
-      p_resolved_entity_id: resolvedEntityId,
-      p_created_follow_up_queue_id: null, // deferred — see header comment
-      p_audio_storage_path: null,         // deferred — see header comment
+      p_parsed_note: finalNote && finalNote.length > 0 ? finalNote : undefined,
+      p_resolved_entity_id: resolvedEntityId ?? undefined,
+      // Both deferred — see header comment.
+      p_created_follow_up_queue_id: undefined,
+      p_audio_storage_path: undefined,
       p_visibility: visibility,
-      p_linked_deal_id: linkedDealId,
-      p_linked_event_id: linkedEventId,
+      p_linked_deal_id: linkedDealId ?? undefined,
+      p_note_scope: noteScope ?? undefined,
+      p_linked_event_id: linkedEventId ?? undefined,
     });
 
   if (rpcError) {
@@ -319,6 +450,33 @@ export async function confirmCapture(
   }
 
   // ── Auto-populate Working notes (Phase 2) ────────────────────────────────
+  // Venue facts, when the capture is about a venue.
+  if (resolvedEntityId && parse.venue_facts && resolvedEntityType === 'venue') {
+    try {
+      await autoFillVenueFacts(supabase, resolvedEntityId, parse.venue_facts);
+    } catch (err) {
+      console.error('[confirmCapture] autoFillVenueFacts failed:', err);
+    }
+  }
+
+  // A spoken rate, when the person has none on file.
+  //
+  // Fill-only, like the working-notes signals above: a rate already recorded is
+  // a number quoted from, and having a misheard "four fifty" silently replace a
+  // real 550 is worse than never hearing it. Changing an existing rate stays a
+  // deliberate edit.
+  if (
+    resolvedEntityId
+    && parse.rate
+    && (resolvedEntityType === 'person' || resolvedEntityType === 'couple')
+  ) {
+    try {
+      await autoFillRate(supabase, resolvedEntityId, parse.rate);
+    } catch (err) {
+      console.error('[confirmCapture] autoFillRate failed:', err);
+    }
+  }
+
   // Only when the parse surfaced explicit signals AND the entity is a person
   // or couple. NEVER overwrites existing values — the user's hand-entry is
   // sacred. Best-effort.

@@ -155,7 +155,10 @@ export async function syncCrewRatesToAssignments(
             event_id: eventId,
             workspace_id: workspaceId,
             entity_id: dc.entity_id,
-            role: dc.role_note,
+            // NOT NULL on ops.crew_assignments, and `role_note` is nullable on
+            // deal_crew -- so a crew row with no note used to fail this insert
+            // outright, taking the whole rate sync with it.
+            role: dc.role_note ?? '',
             pay_rate: dc.day_rate,
             pay_rate_type: 'flat',
             status: dc.confirmed_at ? 'confirmed' : 'requested',

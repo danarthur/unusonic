@@ -1,11 +1,9 @@
-export { getTalentSkillsByOrgMemberId, getSkillTagsByOrgMemberId } from './api/get-talent-skills';
+export { getTalentSkillsByEntityId, getSkillTagsByEntityId } from './api/get-talent-skills';
 export {
   getOrgMemberWithSkills,
   getOrgMemberByProfileAndOrg,
 } from './api/get-org-member-with-skills';
 export type {
-  TalentSkillRow,
-  TalentSkillDTO,
   CrewSkillDTO,
   CrewEquipmentDTO,
   EquipmentCategory,

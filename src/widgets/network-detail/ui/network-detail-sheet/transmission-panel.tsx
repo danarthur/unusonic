@@ -14,25 +14,19 @@
 
 import * as React from 'react';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
-import { TradeLedger } from '../TradeLedger';
-import { PrivateNotes } from '../PrivateNotes';
-import { UpcomingAssignments } from '../UpcomingAssignments';
-import { CrewKitSection } from '../CrewKitSection';
+import { EntityAssignments } from '../EntityAssignments';
 import { QuickBookAction } from '../QuickBookAction';
-import { DealHistoryPanel } from '../DealHistoryPanel';
 import { EntityOverviewCards } from '../EntityOverviewCards';
 import {
   InternalMemberRoleCard,
   InternalMemberFieldsCard,
 } from './member-cards';
-import { InviteCard, RosterStatusCard } from './roster-actions';
 
 export interface TransmissionPanelProps {
   details: NodeDetail;
   workspaceId: string | null;
   sourceOrgId: string;
   onRefresh: () => void;
-  onClose: () => void;
   /** Unused — kept so callers can pass the same prop set as the crew tab. */
   pendingCrew?: NodeDetailCrewMember[];
 }
@@ -42,8 +36,10 @@ export function TransmissionPanel({
   workspaceId,
   sourceOrgId,
   onRefresh,
-  onClose,
 }: TransmissionPanelProps) {
+  // Same destination as the header's "Open full profile", so a count and the
+  // button cannot drift apart.
+  const recordHref = `/network/entity/${details.id}?kind=${details.kind}`;
   const isPartner = details.kind === 'external_partner';
 
   return (
@@ -63,13 +59,6 @@ export function TransmissionPanel({
               <p className="text-lg font-mono tabular-nums text-[var(--stage-text-primary)] mt-0.5">${details.totalPaid.toLocaleString()}</p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ── Partner: Ledger card ── */}
-      {isPartner && (
-        <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
-          <TradeLedger details={details} />
         </div>
       )}
 
@@ -158,58 +147,17 @@ export function TransmissionPanel({
         })()
       }
 
-      {/* ── Partner: Venue specs (on surface) ── */}
-      {isPartner && details.entityDirectoryType === 'venue' && details.orgVenueSpecs && (() => {
-        const specs = details.orgVenueSpecs!;
-        const hasAny = specs.capacity || specs.load_in_notes || specs.power_notes || specs.stage_notes;
-        if (!hasAny) return null;
-        return (
-          <>
-            <div className="h-px bg-[var(--stage-edge-subtle)]" />
-            <div className="space-y-3">
-              <h3 className="stage-label text-[var(--stage-text-secondary)]">Venue specs</h3>
-              <dl className="space-y-3">
-                {specs.capacity && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Capacity</dt>
-                    <dd className="text-[length:var(--stage-data-size)] font-mono tabular-nums text-[var(--stage-text-primary)]">{specs.capacity.toLocaleString()}</dd>
-                  </div>
-                )}
-                {specs.load_in_notes && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Load-in</dt>
-                    <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{specs.load_in_notes}</dd>
-                  </div>
-                )}
-                {specs.power_notes && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Power</dt>
-                    <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{specs.power_notes}</dd>
-                  </div>
-                )}
-                {specs.stage_notes && (
-                  <div>
-                    <dt className="stage-label text-[var(--stage-text-secondary)] mb-0.5">Stage</dt>
-                    <dd className="text-[length:var(--stage-data-size)] text-[var(--stage-text-primary)]">{specs.stage_notes}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-          </>
-        );
-      })()}
+      {/* Venue specs render once, from VenueSpecsCompactCard inside
+          EntityOverviewCards below. This block used to render the same four
+          fields again in a different treatment, so a venue sheet showed two
+          "Venue specs" headings with the same data under each. */}
 
       {/* ── Divider before cards ── */}
       <div className="h-px bg-[var(--stage-edge-subtle)]" />
 
       {/* ── Employee: Upcoming assignments card ── */}
       {!isPartner && details.subjectEntityId && (
-        <UpcomingAssignments entityId={details.subjectEntityId} />
-      )}
-
-      {/* ── Employee: Kit (equipment profile) ── */}
-      {!isPartner && details.subjectEntityId && (
-        <CrewKitSection entityId={details.subjectEntityId} />
+        <EntityAssignments entityId={details.subjectEntityId} variant="summary" />
       )}
 
       {/* ── Employee: Quick-book card ── */}
@@ -218,11 +166,6 @@ export function TransmissionPanel({
           entityId={details.subjectEntityId}
           entityName={details.identity.name}
         />
-      )}
-
-      {/* ── Partner: Deal history card ── */}
-      {isPartner && details.subjectEntityId && (
-        <DealHistoryPanel entityId={details.subjectEntityId} />
       )}
 
       {/* ── AI Brief + Working notes / Team + Timeline + Productions ── */}
@@ -237,22 +180,23 @@ export function TransmissionPanel({
             entityId={details.subjectEntityId}
             entityType={t}
             entityName={details.identity.name ?? null}
-            density="sheet"
+            relationshipId={details.relationshipId}
+            recordHref={recordHref}
           />
         );
       })()}
 
-      {/* ── Notes card ── */}
-      <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
-        <PrivateNotes
-          relationshipId={details.relationshipId}
-          initialNotes={details.notes}
-        />
-      </div>
+      {/* The free-text note now composes at the bottom of the Notes card inside
+          EntityOverviewCards, rather than in a second card down here. */}
 
-      {/* ── Active shows card ── */}
+      {/* ── Active shows ──
+          Every entity type now. This used to be hidden for people because it
+          repeated the productions list's "Booked" band; with that list
+          collapsed to a count, hiding it left a person's panel with no answer
+          to "what are they on next" -- which is the one thing a count cannot
+          give you, because it is the dates you need. */}
       {details.active_events.length > 0 && (
-        <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4" data-surface="elevated">
+        <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)]">
           <h3 className="stage-label text-[var(--stage-text-secondary)] mb-2">
             Active shows
           </h3>
@@ -264,24 +208,16 @@ export function TransmissionPanel({
         </div>
       )}
 
-      {/* ── Employee: Invite card ── */}
-      {!isPartner && (details.inviteStatus === 'ghost' || details.inviteStatus === 'invited') && (
-        <InviteCard
-          details={details}
-          sourceOrgId={sourceOrgId}
-          onSaved={onRefresh}
-        />
-      )}
+      {/*
+        Kit, the invite prompt and the roster-status card used to close out this
+        panel. All three are things you do to a record rather than things you
+        read off one, and each now lives on the record page: kit beside the
+        skills, the invite as a banner at the top, and roster status where it
+        also carries archive and remove.
 
-      {/* ── Employee: Roster status card ── */}
-      {!isPartner && details.canAssignElevatedRole && (
-        <RosterStatusCard
-          details={details}
-          sourceOrgId={sourceOrgId}
-          onRemoved={onClose}
-          onSaved={onRefresh}
-        />
-      )}
+        A drawer that offers every operation is not a peek, it is the page with
+        less room.
+      */}
     </>
   );
 }

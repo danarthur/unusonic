@@ -49,8 +49,8 @@ export function NetworkDetailSheetSkeleton() {
           {/* Content skeleton */}
           <div className="flex-1 px-6 py-5 space-y-4">
             <div className="space-y-4">
-              <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 h-24 stage-skeleton" />
-              <div className="rounded-xl border border-[var(--stage-edge-subtle)] bg-[var(--stage-surface-elevated)] p-4 h-32 stage-skeleton" />
+              <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] h-24 stage-skeleton" />
+              <div className="border-t border-[var(--stage-edge-subtle)] pt-[var(--stage-padding)] h-32 stage-skeleton" />
             </div>
           </div>
         </div>

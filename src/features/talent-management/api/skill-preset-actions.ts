@@ -39,7 +39,7 @@ export async function listWorkspaceSkillPresets(): Promise<string[]> {
  * ops.workspace_job_titles. These are the "crew role" buckets the feasibility
  * chip counts pools against (DJ, Audio A1, Lighting Director, etc.).
  *
- * Used alongside listWorkspaceSkillPresets so the EmployeeEntityForm picker
+ * Used alongside listWorkspaceSkillPresets so the PersonRecordForm picker
  * can render canonical roles in their own optgroup ("Drives crew pools") and
  * the rest as "Other skills."
  */
