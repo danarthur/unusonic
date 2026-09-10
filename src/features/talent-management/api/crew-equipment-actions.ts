@@ -3,6 +3,7 @@
 import 'server-only';
 import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
+import { writeLanded } from '@/shared/lib/write-landed';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import type { CrewEquipmentDTO } from '@/entities/talent';
 
@@ -241,12 +242,15 @@ export async function toggleEquipmentVerification(
     return { ok: false, error: 'Only workspace owners and admins can change this setting.' };
   }
 
-  const { error } = await supabase
-    .from('workspaces')
-    .update({ require_equipment_verification: enabled })
-    .eq('id', workspaceId);
-
-  if (error) return { ok: false, error: error.message };
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update({ require_equipment_verification: enabled })
+      .eq('id', workspaceId)
+      .select('id'),
+    'the verification setting',
+  );
+  if (!landed.ok) return { ok: false, error: landed.error };
 
   // A5 fix: When disabling verification, bulk-approve all pending items
   if (!enabled) {

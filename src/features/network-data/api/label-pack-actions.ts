@@ -48,9 +48,14 @@ export async function setWorkspaceLabelPack(
     update as an error. The action returned ok, the picker showed success, and
     the setting had never once been written since it shipped.
 
-    A policy would have been the smaller change and the wrong one: broad enough
-    to permit this column, it would also permit stripe_customer_id and
-    subscription_status. One column, one function, one check.
+    The objection to a policy was that one broad enough to permit this column
+    would also permit stripe_customer_id and subscription_status. That turned
+    out to be an objection to a policy on its own: 20260910060000 pairs an
+    owner/admin UPDATE policy with a column-level grant, so the policy decides
+    who and the grant decides which. The six other settings that were failing
+    the same way go through that. This one keeps its function -- it is already
+    written, it validates the pack against a closed list, and it reports a miss
+    rather than returning a bare ok.
   */
   const { data, error } = await supabase.rpc('set_workspace_label_pack', {
     p_workspace_id: workspaceId,

@@ -55,6 +55,7 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/shared/api/supabase/server';
+import { writeLanded } from '@/shared/lib/write-landed';
 import { getSystemClient } from '@/shared/api/supabase/system';
 import { getAuthFlag } from '@/shared/lib/auth-flags';
 import { otpEmailSchema, otpVerifySchema } from '../model/schema';
@@ -517,15 +518,19 @@ export async function toggleSmsSigninEnabled(
     return { ok: false, error: 'Not authorized.' };
   }
 
-  const { error: updateErr } = await supabase
-    .from('workspaces')
-    .update({ sms_signin_enabled: enabled })
-    .eq('id', workspaceId);
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update({ sms_signin_enabled: enabled })
+      .eq('id', workspaceId)
+      .select('id'),
+    'the sign-in setting',
+  );
 
-  if (updateErr) {
+  if (!landed.ok) {
     Sentry.captureMessage('toggleSmsSigninEnabled: update failed', {
       level: 'warning',
-      extra: { workspaceId, message: updateErr.message },
+      extra: { workspaceId, message: landed.error },
     });
     return { ok: false, error: 'Could not update setting.' };
   }

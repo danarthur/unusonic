@@ -456,7 +456,8 @@ describe('toggleSmsSigninEnabled', () => {
   it('persists the change when caller is an owner', async () => {
     const fromBuilder = {
       update: updateMock.mockReturnThis(),
-      eq: vi.fn().mockResolvedValue({ error: null }),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [{ id: 'ws-1' }], error: null }),
     };
     createServerClientMock.mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u' } } }) },
@@ -467,5 +468,28 @@ describe('toggleSmsSigninEnabled', () => {
     const result = await toggleSmsSigninEnabled('ws-1', true);
     expect(result.ok).toBe(true);
     expect(updateMock).toHaveBeenCalledWith({ sms_signin_enabled: true });
+  });
+
+  /*
+    The shape this action shipped in for months. `public.workspaces` had no
+    UPDATE policy, so the statement matched zero rows -- and PostgREST does not
+    call that an error. The old assertion here passed against a mock that
+    resolved `{ error: null }`, which is exactly what production was returning
+    while the setting stayed false.
+  */
+  it('reports failure when the update matches no rows', async () => {
+    const fromBuilder = {
+      update: updateMock.mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    createServerClientMock.mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u' } } }) },
+      rpc: rpcMock.mockResolvedValue({ data: true, error: null }),
+      from: vi.fn(() => fromBuilder),
+    });
+
+    const result = await toggleSmsSigninEnabled('ws-1', true);
+    expect(result.ok).toBe(false);
   });
 });

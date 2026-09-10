@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-10T01:39:21.439Z",
+  "generatedAt": "2026-09-10T02:50:36.188Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -115,7 +115,7 @@
     "src/app/(public)/legal/privacy/page.tsx": 247,
     "src/app/(public)/legal/sms/page.tsx": 210,
     "src/app/(public)/legal/terms/page.tsx": 333,
-    "src/app/actions/workspace.ts": 878,
+    "src/app/actions/workspace.ts": 768,
     "src/app/api/aion/capture/parse/route.ts": 662,
     "src/app/api/aion/chat/route.ts": 464,
     "src/app/api/cron/follow-up-queue/route.ts": 670,
@@ -150,7 +150,7 @@
     "src/features/onboarding/api/actions.ts": 654,
     "src/features/onboarding/ui/guardian-setup-step.tsx": 384,
     "src/features/ops/ui/song-search.tsx": 389,
-    "src/features/org-management/api/email-domain-actions.ts": 557,
+    "src/features/org-management/api/email-domain-actions.ts": 577,
     "src/features/run-of-show/api/ros.ts": 483,
     "src/features/sales/api/package-actions.ts": 385,
     "src/features/sales/api/proposal-actions/main.ts": 1129,

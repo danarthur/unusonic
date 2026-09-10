@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/shared/api/supabase/server';
+import { writeLanded } from '@/shared/lib/write-landed';
 import type { PortalThemePreset, PortalThemeConfig } from '@/shared/lib/portal-theme';
 
 const VALID_PRESETS = new Set<string>([
@@ -72,17 +73,18 @@ export async function updatePortalTheme(
     return { success: false, error: 'Only workspace owners and admins can change the portal theme.' };
   }
 
-  const { error } = await supabase
-    .from('workspaces')
-    .update({
-      portal_theme_preset: preset,
-      portal_theme_config: config,
-    })
-    .eq('id', membership.workspace_id);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update({
+        portal_theme_preset: preset,
+        portal_theme_config: config,
+      })
+      .eq('id', membership.workspace_id)
+      .select('id'),
+    'the portal theme',
+  );
+  if (!landed.ok) return { success: false, error: landed.error };
 
   return { success: true };
 }

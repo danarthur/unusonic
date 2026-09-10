@@ -2,6 +2,7 @@
 
 import { z } from 'zod/v4';
 import { createClient } from '@/shared/api/supabase/server';
+import { writeLanded } from '@/shared/lib/write-landed';
 import { getActiveWorkspaceId } from '@/shared/lib/workspace';
 import { revalidatePath } from 'next/cache';
 
@@ -60,12 +61,15 @@ export async function updateWorkspacePaymentDefaults(
     return { success: false, error: 'Only owners and admins can change payment defaults' };
   }
 
-  const { error } = await supabase
-    .from('workspaces')
-    .update(parsed.data)
-    .eq('id', workspaceId);
-
-  if (error) return { success: false, error: error.message };
+  const landed = writeLanded(
+    await supabase
+      .from('workspaces')
+      .update(parsed.data)
+      .eq('id', workspaceId)
+      .select('id'),
+    'the payment defaults',
+  );
+  if (!landed.ok) return { success: false, error: landed.error };
 
   revalidatePath('/settings');
   return { success: true };
