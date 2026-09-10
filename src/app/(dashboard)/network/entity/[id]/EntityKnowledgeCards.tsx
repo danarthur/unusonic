@@ -33,9 +33,8 @@ export interface EntityKnowledgeCardsProps {
   entityId: string;
   entityType: 'person' | 'company' | 'venue' | 'couple';
   entityName: string | null;
-  /** The relationship in view, so the capture panel can host its own composer. */
+  /** The relationship in view, for the capture panel's own deep links. */
   relationshipId?: string | null;
-  relationshipNotes?: string | null;
 }
 
 export function EntityKnowledgeCards({
@@ -44,9 +43,7 @@ export function EntityKnowledgeCards({
   entityType,
   entityName,
   relationshipId,
-  relationshipNotes,
 }: EntityKnowledgeCardsProps) {
-  const isPersonOrCouple = entityType === 'person' || entityType === 'couple';
 
   return (
     <div className="flex flex-col" style={{ gap: 'var(--stage-gap-wide)' }}>
@@ -59,14 +56,19 @@ export function EntityKnowledgeCards({
         entityId={entityId}
         entityType={entityType}
       />
-      {isPersonOrCouple && <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />}
+      {/*
+        For every entity type, not just people. The card holds do-not-rebook,
+        which this branch made meaningful for vendors, and private notes, which
+        a company has as much claim to as a person. Gating it to person/couple
+        left a company's record page with nowhere to record either.
+      */}
+      <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
       <CaptureTimelinePanel
         workspaceId={workspaceId}
         entityId={entityId}
         entityName={entityName}
         entityType={entityType}
         relationshipId={relationshipId}
-        initialNotes={relationshipNotes}
       />
     </div>
   );

@@ -653,34 +653,21 @@ export async function validateInvitation(
   };
 }
 
-/**
- * Update private notes for an org.
- */
-export async function updatePrivateNotes(
-  subject_org_id: string,
-  private_notes: string | null,
-  internal_rating: number | null
-): Promise<{ ok: boolean; error?: string }> {
-  const supabase = await createClient();
-  const { orgId } = await getCurrentEntityAndOrg(supabase);
-  if (!orgId) return { ok: false, error: 'Not authorized.' };
+/*
+  updatePrivateNotes lived here.
 
-  /*
-    This wrote to `public.org_private_data`, which does not exist. The upsert
-    404'd, the error was returned -- but the two callers (the client card on a
-    deal, and the Private notes tab in the network sheet) both show a generic
-    failure, so what an owner saw was their typed notes vanishing with a shrug.
+  It wrote `public.org_private_data`, keyed (owner_org_id, subject_org_id) -- a
+  table that does not exist, so the upsert answered 404 and what somebody typed
+  about a client was discarded behind a generic failure.
 
-    Refusing plainly is better than a 404 relayed as a message. The feature
-    comes back on `directory.entity_working_notes` with a `private_notes`
-    column; until then this does not pretend.
-  */
-  void supabase;
-  void subject_org_id;
-  void private_notes;
-  void internal_rating;
-  return {
-    ok: false,
-    error: 'Private notes are not available yet. Nothing was saved.',
-  };
-}
+  Private notes are on `directory.entity_working_notes` now, keyed
+  (workspace_id, entity_id), written through `upsert_entity_working_notes` like
+  the rest of that row. The deal drawer calls
+  `updateClientPrivateNotes(entityId, notes)`; the record page's "How to handle"
+  card writes the same field.
+
+  `internal_rating` does not come back with it. Its only interface was the
+  Private notes tab in EntitySheet, which nothing rendered, and a 1-5 number
+  with no defined meaning is worse than no field.
+*/
+

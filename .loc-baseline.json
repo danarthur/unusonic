@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-10T03:56:51.205Z",
+  "generatedAt": "2026-09-10T20:31:02.784Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -23,7 +23,7 @@
     "src/app/(dashboard)/(features)/events/actions/deal-actions.ts": 384,
     "src/app/(dashboard)/(features)/events/actions/deal-crew/main.ts": 891,
     "src/app/(dashboard)/(features)/events/actions/deal-crew/search.ts": 400,
-    "src/app/(dashboard)/(features)/events/actions/deal-stakeholders.ts": 747,
+    "src/app/(dashboard)/(features)/events/actions/deal-stakeholders.ts": 719,
     "src/app/(dashboard)/(features)/events/actions/follow-up-actions.ts": 611,
     "src/app/(dashboard)/(features)/events/actions/get-aion-card-for-deal.ts": 833,
     "src/app/(dashboard)/(features)/events/actions/get-crm-gigs.ts": 382,
@@ -35,7 +35,7 @@
     "src/app/(dashboard)/(features)/events/components/aion-plan-card.tsx": 482,
     "src/app/(dashboard)/(features)/events/components/call-times-card.tsx": 372,
     "src/app/(dashboard)/(features)/events/components/ceramic-date-picker.tsx": 371,
-    "src/app/(dashboard)/(features)/events/components/client-identity-card.tsx": 376,
+    "src/app/(dashboard)/(features)/events/components/client-identity-card.tsx": 384,
     "src/app/(dashboard)/(features)/events/components/close-out-card.tsx": 578,
     "src/app/(dashboard)/(features)/events/components/confirmed-crew-row.tsx": 580,
     "src/app/(dashboard)/(features)/events/components/conflicts-panel.tsx": 514,
@@ -84,7 +84,7 @@
     "src/app/(dashboard)/layout.tsx": 263,
     "src/app/(dashboard)/lobby/LobbyBentoGrid.tsx": 441,
     "src/app/(dashboard)/lobby/stage-prototype/page-client.tsx": 501,
-    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 735,
+    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 734,
     "src/app/(dashboard)/network/entity/[id]/page.tsx": 228,
     "src/app/(dashboard)/network/entity/[id]/PersonRecordForm.tsx": 554,
     "src/app/(dashboard)/network/entity/[id]/VenueSpecsEditor.tsx": 647,
@@ -145,7 +145,7 @@
     "src/features/network-data/api/network-read-actions/node-details.ts": 444,
     "src/features/network-data/ui/entity-documents-card.tsx": 573,
     "src/features/network-data/ui/GhostForgeSheet.tsx": 681,
-    "src/features/network/api/actions.ts": 686,
+    "src/features/network/api/actions.ts": 673,
     "src/features/network/ui/ClaimView.tsx": 402,
     "src/features/onboarding/api/actions.ts": 654,
     "src/features/onboarding/ui/guardian-setup-step.tsx": 384,
@@ -183,10 +183,9 @@
     "src/widgets/event-dashboard/ui/EventCommandGrid.tsx": 475,
     "src/widgets/event-dashboard/ui/logistics/TimeCapsule.tsx": 574,
     "src/widgets/lobby-capture/ui/CaptureModal.tsx": 969,
-    "src/widgets/network-detail/ui/CaptureTimelinePanel.tsx": 791,
+    "src/widgets/network-detail/ui/CaptureTimelinePanel.tsx": 789,
     "src/widgets/network-detail/ui/CrewKitSection.tsx": 495,
-    "src/widgets/network-detail/ui/DossierEditor.tsx": 893,
-    "src/widgets/network-detail/ui/WorkingNotesCard.tsx": 477,
+    "src/widgets/network-detail/ui/WorkingNotesCard.tsx": 534,
     "src/widgets/org-dashboard/ui/OrgDashboardSheet.tsx": 522
   }
 }

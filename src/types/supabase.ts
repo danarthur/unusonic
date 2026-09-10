@@ -1455,6 +1455,7 @@ export type Database = {
           dnr_reason: string | null
           entity_id: string
           preferred_channel: string | null
+          private_notes: string | null
           updated_at: string
           updated_by: string | null
           workspace_id: string
@@ -1467,6 +1468,7 @@ export type Database = {
           dnr_reason?: string | null
           entity_id: string
           preferred_channel?: string | null
+          private_notes?: string | null
           updated_at?: string
           updated_by?: string | null
           workspace_id: string
@@ -1479,6 +1481,7 @@ export type Database = {
           dnr_reason?: string | null
           entity_id?: string
           preferred_channel?: string | null
+          private_notes?: string | null
           updated_at?: string
           updated_by?: string | null
           workspace_id?: string
@@ -1507,6 +1510,7 @@ export type Database = {
           p_dnr_reason?: string
           p_entity_id: string
           p_preferred_channel?: string
+          p_private_notes?: string
           p_source?: string
           p_workspace_id: string
         }

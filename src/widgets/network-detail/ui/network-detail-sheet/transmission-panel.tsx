@@ -181,7 +181,6 @@ export function TransmissionPanel({
             entityType={t}
             entityName={details.identity.name ?? null}
             relationshipId={details.relationshipId}
-            relationshipNotes={details.notes}
             recordHref={recordHref}
           />
         );

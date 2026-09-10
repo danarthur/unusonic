@@ -419,7 +419,6 @@ function CompanyEntityForm({ details, sourceOrgId, returnPath = '/network', work
               entityType={(details.entityDirectoryType as 'company' | 'venue') ?? 'company'}
               entityName={name || details.identity.name || null}
               relationshipId={details.relationshipId}
-              relationshipNotes={details.notes}
             />
           )}
 

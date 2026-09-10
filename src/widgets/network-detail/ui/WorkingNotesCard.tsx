@@ -7,11 +7,12 @@
  * look like a half-built product, so we hide them until a real value lands.
  *
  * Always shows an edit affordance (pencil on hover of the card, or the "Add
- * working notes" empty-state when nothing exists yet). Edit surfaces three
+ * working notes" empty-state when nothing exists yet). Edit surfaces four
  * inline fields:
  *   • Communication style — free text, ≤ 200 chars
  *   • DNR — toggle + reason select + optional note
  *   • Preferred channel — call / email / sms / none
+ *   • Private notes — free text, ≤ 5000 chars, never written by a capture
  *
  * Design: docs/reference/network-page-ia-redesign.md §4.1, §12.4.
  */
@@ -36,6 +37,7 @@ import {
   updateWorkingNotes,
   type UpdateWorkingNotesPatch,
 } from '../api/update-working-notes';
+import { PRIVATE_NOTES_MAX } from '../model/working-notes-limits';
 import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface WorkingNotesCardProps {
@@ -89,7 +91,8 @@ export function WorkingNotesCard({ workspaceId, entityId }: WorkingNotesCardProp
   const hasContent =
     !!notes?.communicationStyle ||
     notes?.dnrFlagged ||
-    !!notes?.preferredChannel;
+    !!notes?.preferredChannel ||
+    !!notes?.privateNotes;
 
   // Empty state + not editing → render a subtle "Add" affordance that fits
   // a minimal profile without looking broken.
@@ -171,6 +174,7 @@ const DEFAULT_NOTES: WorkingNotes = {
   dnrReason: null,
   dnrNote: null,
   preferredChannel: null,
+  privateNotes: null,
   updatedAt: null,
   updatedByName: null,
   autoFilledFields: [],
@@ -262,6 +266,23 @@ function WorkingNotesDisplay({ notes }: { notes: WorkingNotes }) {
         </p>
       )}
 
+      {/*
+        Private notes read as prose, so they get their own block rather than a
+        chip. `whitespace-pre-wrap` because someone who types paragraphs meant
+        them. No AionFilled: a capture cannot write this field.
+      */}
+      {notes.privateNotes && (
+        <div className="pt-1 space-y-1">
+          <p className="flex items-center gap-1 stage-label text-[var(--stage-text-tertiary)]">
+            <Lock className="size-2.5" strokeWidth={1.5} />
+            Private notes
+          </p>
+          <p className="whitespace-pre-wrap text-[length:var(--stage-data-size)] leading-snug text-[var(--stage-text-primary)]">
+            {notes.privateNotes}
+          </p>
+        </div>
+      )}
+
       {notes.updatedAt && notes.updatedByName && (
         <div className="flex items-center gap-1 pt-0.5 text-[10px] text-[var(--stage-text-tertiary)]">
           <Lock className="size-2.5" strokeWidth={1.5} />
@@ -294,6 +315,7 @@ function WorkingNotesEditor({
     initial.dnrReason ?? '',
   );
   const [dnrNote, setDnrNote] = React.useState(initial.dnrNote ?? '');
+  const [privateNotes, setPrivateNotes] = React.useState(initial.privateNotes ?? '');
 
   const handleSave = () => {
     // Build a patch that only includes CHANGED fields. "Empty string" means
@@ -326,6 +348,11 @@ function WorkingNotesEditor({
       if (dnrNote !== origNote) {
         patch.dnr.note = dnrNote === '' ? '' : dnrNote;
       }
+    }
+
+    const origPrivate = initial.privateNotes ?? '';
+    if (privateNotes !== origPrivate) {
+      patch.privateNotes = privateNotes === '' ? '' : privateNotes;
     }
 
     void onSave(patch);
@@ -437,6 +464,36 @@ function WorkingNotesEditor({
             />
           </>
         )}
+      </div>
+
+      {/* Private notes */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label>Private notes</Label>
+          {privateNotes.length > PRIVATE_NOTES_MAX - 500 && (
+            <span className="text-[10px] text-[var(--stage-text-tertiary)] tabular-nums">
+              {privateNotes.length} / {PRIVATE_NOTES_MAX}
+            </span>
+          )}
+        </div>
+        <textarea
+          value={privateNotes}
+          onChange={(e) => setPrivateNotes(e.target.value.slice(0, PRIVATE_NOTES_MAX))}
+          placeholder="What you would want to remember before the next conversation"
+          rows={4}
+          disabled={saving}
+          className={cn(
+            'w-full text-sm px-2 py-1.5 rounded-md resize-y',
+            'border border-[var(--stage-edge-subtle)] bg-[var(--ctx-well)]',
+            'text-[var(--stage-text-primary)]',
+            'placeholder:text-[var(--stage-text-tertiary)]',
+            'focus:outline-none focus:ring-1 focus:ring-[var(--stage-accent)]/50',
+          )}
+        />
+        <p className="flex items-center gap-1 text-[10px] text-[var(--stage-text-tertiary)]">
+          <Lock className="size-2.5" strokeWidth={1.5} />
+          Only your workspace sees this.
+        </p>
       </div>
 
       {/* Save / cancel */}

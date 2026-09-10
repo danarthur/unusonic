@@ -54,7 +54,6 @@ import {
   searchReassignTargets,
   type ReassignTarget,
 } from '../api/search-reassign-targets';
-import { PrivateNotes } from './PrivateNotes';
 import { formatRelative } from '@/shared/lib/format-relative';
 
 export interface CaptureTimelinePanelProps {
@@ -77,7 +76,6 @@ export interface CaptureTimelinePanelProps {
    * Absent on the full entity page, which has no single relationship in view.
    */
   relationshipId?: string | null;
-  initialNotes?: string | null;
 }
 
 // Group-by-production threshold per design Decision B default: flat until
@@ -146,7 +144,6 @@ export function CaptureTimelinePanel({
   entityName,
   entityType = null,
   relationshipId = null,
-  initialNotes = null,
 }: CaptureTimelinePanelProps) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -309,14 +306,15 @@ export function CaptureTimelinePanel({
         </AnimatePresence>
       </CaptureShowNotes>
 
-      {/* Compose at the bottom, under what is already there -- the same shape as
-          every message thread, and the reason this is one card rather than a
-          list here and an input somewhere further down. */}
-      {relationshipId && (
-        <div className="border-t border-[var(--stage-edge-subtle)] pt-3">
-          <PrivateNotes relationshipId={relationshipId} initialNotes={initialNotes} />
-        </div>
-      )}
+      {/*
+        A notes composer used to sit here, writing `context_data.notes` on the
+        relationship edge. It is gone: "How to handle" above this panel now
+        holds private notes on the entity itself, and two boxes labelled Notes
+        on one page is one too many. The edge-scoped version was the worse of
+        the two anyway -- it rendered "Available for partners." whenever there
+        was no edge, which is most contacts, and a note you keep about somebody
+        should not depend on how you happen to be related to them.
+      */}
     </div>
   );
 }

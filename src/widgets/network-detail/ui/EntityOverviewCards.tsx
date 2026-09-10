@@ -52,7 +52,6 @@ export interface EntityOverviewCardsProps {
    * own composer instead of a second notes card living elsewhere on the sheet.
    */
   relationshipId?: string | null;
-  relationshipNotes?: string | null;
   /** The record page for this node. Segments of the history row link into it. */
   recordHref?: string;
   className?: string;
@@ -64,7 +63,6 @@ export function EntityOverviewCards({
   entityType,
   entityName,
   relationshipId = null,
-  relationshipNotes = null,
   recordHref,
   className,
 }: EntityOverviewCardsProps) {
@@ -117,16 +115,15 @@ export function EntityOverviewCards({
         where you go when the glance is not enough.
       */}
       <Zone label="What we know">
-        {isPersonOrCouple && (
-          <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
-        )}
+        {/* Every entity type: do-not-rebook and private notes are as much a
+            company's as a person's. */}
+        <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />
         <CaptureTimelinePanel
           workspaceId={workspaceId}
           entityId={entityId}
           entityName={entityName}
           entityType={entityType}
           relationshipId={relationshipId}
-          initialNotes={relationshipNotes}
         />
       </Zone>
     </div>
