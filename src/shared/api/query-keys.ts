@@ -27,8 +27,6 @@ export const queryKeys = {
       ["entities", wsId, "detail", entityId] as const,
     captures: (wsId: string, entityId: string) =>
       ["entities", wsId, "detail", entityId, "captures"] as const,
-    summary: (wsId: string, entityId: string) =>
-      ["entities", wsId, "detail", entityId, "summary"] as const,
     workingNotes: (wsId: string, entityId: string) =>
       ["entities", wsId, "detail", entityId, "workingNotes"] as const,
     teamPreview: (wsId: string, entityId: string) =>

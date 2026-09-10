@@ -16,15 +16,15 @@
  * think about this entity, they sit above the fields you edit, and they belong
  * here.
  *
- * The brief leads, because that is where every vendor puts generated summary on
- * a record page -- Power Apps' insights bar, D365's insight banner, HubSpot's
- * summary card -- at the top of the primary column, in an ordinary container.
+ * The computed facts lead. There used to be a generated brief above them; it
+ * told the owner that a real coordinator "is a ghost" and that a client "is a
+ * client with contact details on file", and the strip now says the same class of
+ * thing from a query, labelled and checkable. See §B3 of the design note.
  *
  * @module app/network/entity/EntityKnowledgeCards
  */
 
 import { PromotedMetricsRow } from '@/widgets/network-detail/ui/PromotedMetricsRow';
-import { EntitySummaryCard } from '@/widgets/network-detail/ui/EntitySummaryCard';
 import { WorkingNotesCard } from '@/widgets/network-detail/ui/WorkingNotesCard';
 import { CaptureTimelinePanel } from '@/widgets/network-detail/ui/CaptureTimelinePanel';
 
@@ -59,7 +59,6 @@ export function EntityKnowledgeCards({
         entityId={entityId}
         entityType={entityType}
       />
-      <EntitySummaryCard workspaceId={workspaceId} entityId={entityId} entityType={entityType} />
       {isPersonOrCouple && <WorkingNotesCard workspaceId={workspaceId} entityId={entityId} />}
       <CaptureTimelinePanel
         workspaceId={workspaceId}

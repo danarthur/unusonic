@@ -195,11 +195,10 @@ export function CaptureTimelinePanel({
   );
 
   const invalidate = React.useCallback(() => {
+    // Only the captures. The generated brief that also read this entity is
+    // gone, and nothing else changes when a note lands.
     queryClient.invalidateQueries({
       queryKey: queryKeys.entities.captures(workspaceId, entityId),
-    });
-    queryClient.invalidateQueries({
-      queryKey: queryKeys.entities.summary(workspaceId, entityId),
     });
   }, [queryClient, workspaceId, entityId]);
 

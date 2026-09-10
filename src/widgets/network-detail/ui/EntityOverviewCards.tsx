@@ -33,7 +33,6 @@
 
 import * as React from 'react';
 import { cn } from '@/shared/lib/utils';
-import { EntitySummaryCard } from './EntitySummaryCard';
 import { CaptureTimelinePanel } from './CaptureTimelinePanel';
 import { WorkingNotesCard } from './WorkingNotesCard';
 import { EmploymentCard } from './EmploymentCard';
@@ -87,11 +86,6 @@ export function EntityOverviewCards({
         you jump.
       */}
       <Zone label="Who they are">
-        <EntitySummaryCard
-          workspaceId={workspaceId}
-          entityId={entityId}
-          entityType={entityType}
-        />
         {isPersonOrCouple && (
           <EmploymentCard workspaceId={workspaceId} entityId={entityId} />
         )}
