@@ -44,9 +44,12 @@ export async function switchWorkspaceAction(workspaceId: string) {
     maxAge: ACTIVE_WORKSPACE_COOKIE_MAX_AGE_SECONDS,
   });
 
-  const destination = DASHBOARD_ROLES.includes(membership.role)
+  // A membership with no role text is not a dashboard role and not a client
+  // role; it lands where the narrowest role lands.
+  const role = membership.role ?? '';
+  const destination = DASHBOARD_ROLES.includes(role)
     ? '/lobby'
-    : CLIENT_ROLES.includes(membership.role)
+    : CLIENT_ROLES.includes(role)
       ? '/client/home'
       : '/schedule';
 

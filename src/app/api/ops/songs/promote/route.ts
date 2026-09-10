@@ -82,9 +82,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .eq('id', input.eventId)
     .maybeSingle();
 
-  if (!eventRow) {
+  // `workspace_id` is nullable on ops.events, and every audit line written
+  // below is scoped by it. An event that is in no workspace is not one this
+  // route can act on or account for.
+  if (!eventRow?.workspace_id) {
     return NextResponse.json({ ok: false, reason: 'event_not_found' }, { status: 404 });
   }
+  const workspaceId = eventRow.workspace_id;
 
   // --- Call the RPC as authenticated (uses the staff JWT, not service_role) ---
    
@@ -101,7 +105,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const reason = error?.message ?? row?.reason ?? 'unknown_error';
     await logAccess({
       entityId: eventRow.client_entity_id ?? user.id,
-      workspaceId: eventRow.workspace_id,
+      workspaceId,
       resourceType: 'song_request',
       resourceId: input.entryId,
       action: 'song_promote',
@@ -127,7 +131,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   await logAccess({
     entityId: eventRow.client_entity_id ?? user.id,
-    workspaceId: eventRow.workspace_id,
+    workspaceId,
     resourceType: 'song_request',
     resourceId: input.entryId,
     action: 'song_promote',

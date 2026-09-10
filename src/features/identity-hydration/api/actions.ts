@@ -10,6 +10,7 @@
 import { createClient } from '@/shared/api/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { Profile } from '../model/types';
+import type { TablesInsert } from '@/types/supabase';
 
 // ============================================================================
 // Profile Actions
@@ -22,7 +23,6 @@ import type { Profile } from '../model/types';
 export async function updateProfile(data: {
   fullName?: string;
   avatarUrl?: string | null;
-  preferences?: Record<string, unknown>;
 }): Promise<{ success: boolean; error?: string; profile?: Profile }> {
   const supabase = await createClient();
 
@@ -33,12 +33,18 @@ export async function updateProfile(data: {
     return { success: false, error: 'Not authenticated' };
   }
 
-  const upsertData: Record<string, unknown> = {
+  /*
+    `preferences` used to be accepted here and written to a `profiles.preferences`
+    column that does not exist -- any caller passing it would have got a 400 for
+    the whole upsert, taking the name and avatar down with it. No caller ever
+    did. Typing the payload as the table's own Insert shape is what makes that
+    visible.
+  */
+  const upsertData: TablesInsert<'profiles'> = {
     id: user.id,
   };
   if (data.fullName !== undefined) upsertData.full_name = data.fullName;
   if (data.avatarUrl !== undefined) upsertData.avatar_url = data.avatarUrl;
-  if (data.preferences !== undefined) upsertData.preferences = data.preferences;
 
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -109,68 +115,21 @@ export async function completeOnboarding(): Promise<{ success: boolean; error?: 
 // Workspace Actions
 // ============================================================================
 
-/**
- * Joins a workspace using an invite code
- */
-export async function joinWorkspace(inviteCode: string): Promise<{ 
-  success: boolean; 
-  error?: string; 
-  workspace?: { id: string; name: string };
-}> {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-  
-  // Find workspace by invite code
-  const { data: workspace, error: findError } = await supabase
-    .from('workspaces')
-    .select('id, name')
-    .eq('invite_code', inviteCode)
-    .single();
-  
-  if (findError || !workspace) {
-    return { success: false, error: 'Invalid invite code' };
-  }
-  
-  // Check if already a member
-  const { data: existingMember } = await supabase
-    .from('workspace_members')
-    .select('id')
-    .eq('workspace_id', workspace.id)
-    .eq('user_id', user.id)
-    .single();
-  
-  if (existingMember) {
-    return { success: false, error: 'Already a member of this workspace' };
-  }
-  
-  // Add user as member
-  const { error: joinError } = await supabase
-    .from('workspace_members')
-    .insert({
-      workspace_id: workspace.id,
-      user_id: user.id,
-      role: 'member',
-    });
-  
-  if (joinError) {
-    return { success: false, error: joinError.message };
-  }
-  
-  revalidatePath('/');
-  return { success: true, workspace };
-}
+/*
+  joinWorkspace lived here and is gone.
 
-// ============================================================================
-// Avatar Upload
-// ============================================================================
+  It looked a workspace up by `workspaces.invite_code` and checked membership by
+  `workspace_members.id`. Neither column exists, so both queries answered 400
+  and the function could only ever return 'Invalid invite code'. It was exported
+  from the feature barrel and called by nothing.
 
-/**
- * Uploads an avatar image and updates the profile
- */
+  Joining a workspace goes through `public.invitations` and
+  `acceptEmployeeInvite`. The two SECURITY DEFINER functions from the invite-code
+  design -- `regenerate_invite_code` and `workspace_joinable_by_invite` -- are
+  still in the database and reference the same absent columns; they raise if
+  called, and nothing calls them.
+*/
+
 export async function uploadAvatar(formData: FormData): Promise<{
   success: boolean;
   error?: string;

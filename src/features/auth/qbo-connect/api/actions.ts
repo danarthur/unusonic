@@ -88,7 +88,7 @@ export async function initiateConnection(workspaceId: string): Promise<InitiateR
     .eq('user_id', user.id)
     .single();
 
-  if (!membership || !['owner', 'admin'].includes(membership.role)) {
+  if (!membership?.role || !['owner', 'admin'].includes(membership.role)) {
     return { success: false, error: 'You must be a workspace admin to connect QuickBooks' };
   }
 
