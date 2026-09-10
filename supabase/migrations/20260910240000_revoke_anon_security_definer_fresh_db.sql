@@ -33,43 +33,9 @@ DECLARE
   v_auth_had boolean;
   v_svc_had  boolean;
   v_closed   int := 0;
-  -- Executable by anon on purpose. Keep in step with pgTAP 01700, which
-  -- asserts the resulting set exactly.
-  v_allow text[] := ARRAY[
-    'finance.get_public_invoice',
-    'public.client_is_workspace_client',
-    'public.current_entity_id',
-    'public.get_active_workspace_id',
-    'public.get_current_org_id',
-    'public.get_member_role_slug',
-    'public.get_my_client_entity_ids',
-    'public.get_my_entity_id',
-    'public.get_my_organization_ids',
-    'public.get_my_workspace_ids',
-    'public.get_user_workspace_ids',
-    'public.is_member_of',
-    'public.is_workspace_member',
-    'public.is_workspace_owner',
-    'public.member_has_capability',
-    'public.my_org_ids_admin_member',
-    'public.unusonic_current_entity_email',
-    'public.unusonic_current_entity_id',
-    'public.unusonic_org_ids_can_affiliate',
-    'public.unusonic_org_ids_for_entity',
-    'public.unusonic_org_ids_where_admin',
-    'public.user_has_workspace_role',
-    'public.workspace_created_by_me',
-    'public.client_portal_cascade_revoke_on_proposal_token_change',
-    'public.cortex_relationships_audit_trail',
-    'public.ensure_profile_exists',
-    'public.entities_set_updated_at',
-    'public.handle_new_user',
-    'public.set_org_member_workspace_id',
-    'public.set_talent_skill_workspace_id',
-    'public.sync_gig_to_event',
-    'public.sync_workspace_roles_to_app_metadata',
-    'public.trigger_spine_audit'
-  ];
+  -- The allowlist lives in `public.anon_executable_secdef_allowlist()`
+  -- (20260910235000), so this migration, its own assertion below, and pgTAP
+  -- 01700 all read one definition instead of three copies of it.
 BEGIN
   FOR r IN
     SELECT p.oid,
@@ -80,7 +46,7 @@ BEGIN
     WHERE p.prosecdef
       AND p.prokind = 'f'
       AND n.nspname IN ('public','ops','finance','directory','cortex','aion')
-      AND NOT ((n.nspname || '.' || p.proname) = ANY (v_allow))
+      AND NOT ((n.nspname || '.' || p.proname) = ANY (public.anon_executable_secdef_allowlist()))
       AND has_function_privilege('anon', p.oid, 'EXECUTE')
   LOOP
     -- Record what the roles that SHOULD keep access have, before PUBLIC goes.
@@ -106,32 +72,12 @@ END $$;
 DO $$
 DECLARE v_extra text;
 BEGIN
-  SELECT string_agg(n.nspname || '.' || p.proname, ', ' ORDER BY n.nspname, p.proname)
-    INTO v_extra
+  SELECT string_agg(n.nspname || '.' || p.proname, ', ' ORDER BY n.nspname, p.proname) INTO v_extra
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE p.prosecdef AND p.prokind = 'f'
     AND n.nspname IN ('public','ops','finance','directory','cortex','aion')
     AND has_function_privilege('anon', p.oid, 'EXECUTE')
-    AND (n.nspname || '.' || p.proname) NOT IN (
-      'finance.get_public_invoice','public.client_is_workspace_client',
-      'public.current_entity_id','public.get_active_workspace_id',
-      'public.get_current_org_id','public.get_member_role_slug',
-      'public.get_my_client_entity_ids','public.get_my_entity_id',
-      'public.get_my_organization_ids','public.get_my_workspace_ids',
-      'public.get_user_workspace_ids','public.is_member_of',
-      'public.is_workspace_member','public.is_workspace_owner',
-      'public.member_has_capability','public.my_org_ids_admin_member',
-      'public.unusonic_current_entity_email','public.unusonic_current_entity_id',
-      'public.unusonic_org_ids_can_affiliate','public.unusonic_org_ids_for_entity',
-      'public.unusonic_org_ids_where_admin','public.user_has_workspace_role',
-      'public.workspace_created_by_me',
-      'public.client_portal_cascade_revoke_on_proposal_token_change',
-      'public.cortex_relationships_audit_trail','public.ensure_profile_exists',
-      'public.entities_set_updated_at','public.handle_new_user',
-      'public.set_org_member_workspace_id','public.set_talent_skill_workspace_id',
-      'public.sync_gig_to_event','public.sync_workspace_roles_to_app_metadata',
-      'public.trigger_spine_audit'
-    );
+    AND NOT ((n.nspname || '.' || p.proname) = ANY (public.anon_executable_secdef_allowlist()));
 
   IF v_extra IS NOT NULL THEN
     RAISE EXCEPTION 'anon can still execute SECURITY DEFINER functions off the allowlist: %', v_extra;
