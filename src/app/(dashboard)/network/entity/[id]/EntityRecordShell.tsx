@@ -42,6 +42,7 @@ import { ArrowLeft, Save, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { EntityAvatar } from '@/entities/network/ui/EntityAvatar';
 import { LinkedPeople } from '@/entities/network/ui/LinkedPeople';
+import { EntityStateChip } from '@/widgets/network-detail/ui/EntityStateChip';
 import { STAGE_MEDIUM } from '@/shared/lib/motion-constants';
 import { useUnsavedChanges } from '@/shared/lib/use-unsaved-changes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/shared/ui/dialog';
@@ -79,6 +80,8 @@ export interface EntityRecordShellProps {
   returnPath: string;
   /** The caller's own org. Needed to summon a person when linking a new one. */
   sourceOrgId?: string;
+  /** From the relationship edge, for the state chip. */
+  doNotRebook?: boolean;
   /**
    * The save bar appears only once there is something to save. Omit `onSave`
    * for a read-only record -- the direct-entity view has no form to commit.
@@ -93,6 +96,65 @@ export interface EntityRecordShellProps {
   /** Full-width, above the columns. The employee invite prompt is the one user. */
   banner?: React.ReactNode;
   children: React.ReactNode;
+}
+
+/**
+ * Name, mark, state, and who else is on the record.
+ *
+ * Identity is the one thing meant to repeat across the card, the panel and the
+ * page -- seeing the same mark is how you know a click kept you on the same
+ * person. The state chip sits with it because it is read in the same glance.
+ */
+function RecordIdentity({
+  name,
+  eyebrow,
+  avatarUrl,
+  avatarType,
+  entityId,
+  workspaceId,
+  sourceOrgId,
+  doNotRebook,
+}: Pick<
+  EntityRecordShellProps,
+  'name' | 'eyebrow' | 'avatarUrl' | 'avatarType' | 'entityId' | 'workspaceId' | 'sourceOrgId' | 'doNotRebook'
+>) {
+  return (
+    <>
+    {/*
+      Identity, rendered the way it is on the card and in the panel. It is
+      the one thing meant to repeat across the three surfaces -- seeing
+      the same mark is how you know a click kept you on the same person.
+    */}
+    <div className="flex min-w-0 items-center gap-3">
+      <EntityAvatar name={name} avatarUrl={avatarUrl ?? null} entityType={avatarType} />
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
+          {name || 'Untitled'}
+        </h1>
+        <p className="truncate stage-label">{eyebrow}</p>
+      </div>
+      {/* In the header, not a tab. Blackbaud puts the spouse in the
+          constituent profile header for the same reason: a person you
+          have to go looking for might as well not be linked. */}
+      {workspaceId && entityId && (
+        <EntityStateChip
+          workspaceId={workspaceId}
+          entityId={entityId}
+          doNotRebook={doNotRebook}
+        />
+      )}
+      {workspaceId && entityId && (
+        <LinkedPeople
+          workspaceId={workspaceId}
+          entityId={entityId}
+          hrefFor={(id) => `/network/entity/${id}`}
+          editable
+          sourceOrgId={sourceOrgId}
+        />
+      )}
+    </div>
+    </>
+  );
 }
 
 function RecordOverflow({ actions }: { actions: RecordAction[] }) {
@@ -139,6 +201,7 @@ export function EntityRecordShell({
   avatarType,
   returnPath,
   sourceOrgId,
+  doNotRebook,
   dirty = false,
   saving = false,
   onSave,
@@ -175,32 +238,16 @@ export function EntityRecordShell({
           >
             <ArrowLeft className="size-5" strokeWidth={1.5} />
           </Button>
-          {/*
-            Identity, rendered the way it is on the card and in the panel. It is
-            the one thing meant to repeat across the three surfaces -- seeing
-            the same mark is how you know a click kept you on the same person.
-          */}
-          <div className="flex min-w-0 items-center gap-3">
-            <EntityAvatar name={name} avatarUrl={avatarUrl ?? null} entityType={avatarType} />
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-medium tracking-tight text-[var(--stage-text-primary)]">
-                {name || 'Untitled'}
-              </h1>
-              <p className="truncate stage-label">{eyebrow}</p>
-            </div>
-            {/* In the header, not a tab. Blackbaud puts the spouse in the
-                constituent profile header for the same reason: a person you
-                have to go looking for might as well not be linked. */}
-            {workspaceId && entityId && (
-              <LinkedPeople
-                workspaceId={workspaceId}
-                entityId={entityId}
-                hrefFor={(id) => `/network/entity/${id}`}
-                editable
-                sourceOrgId={sourceOrgId}
-              />
-            )}
-          </div>
+          <RecordIdentity
+            name={name}
+            eyebrow={eyebrow}
+            avatarUrl={avatarUrl}
+            avatarType={avatarType}
+            entityId={entityId}
+            workspaceId={workspaceId}
+            sourceOrgId={sourceOrgId}
+            doNotRebook={doNotRebook}
+          />
         </div>
 
         <div className="flex shrink-0 items-center gap-3">

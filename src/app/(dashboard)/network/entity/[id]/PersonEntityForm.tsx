@@ -106,6 +106,7 @@ export function PersonEntityForm({
       avatarType="person"
       returnPath={returnPath}
       sourceOrgId={sourceOrgId}
+      doNotRebook={details.doNotRebook}
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}

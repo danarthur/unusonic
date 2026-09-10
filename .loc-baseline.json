@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T23:57:17.163Z",
+  "generatedAt": "2026-09-10T00:35:30.531Z",
   "note": "Per-file raw LOC snapshot for every file currently flagged by max-lines in .eslint-baseline.json. Closes the gap where max-lines fires once-per-file regardless of size, letting flagged files grow invisibly. Regenerate with: npm run loc:baseline:snapshot. Check with: npm run loc:baseline:check.",
   "files": {
     "src/app/(auth)/onboarding/components/onboarding-wizard.tsx": 375,
@@ -84,9 +84,9 @@
     "src/app/(dashboard)/layout.tsx": 263,
     "src/app/(dashboard)/lobby/LobbyBentoGrid.tsx": 441,
     "src/app/(dashboard)/lobby/stage-prototype/page-client.tsx": 501,
-    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 734,
+    "src/app/(dashboard)/network/entity/[id]/EntityStudioClient.tsx": 735,
     "src/app/(dashboard)/network/entity/[id]/page.tsx": 228,
-    "src/app/(dashboard)/network/entity/[id]/PersonRecordForm.tsx": 546,
+    "src/app/(dashboard)/network/entity/[id]/PersonRecordForm.tsx": 547,
     "src/app/(dashboard)/network/entity/[id]/VenueSpecsEditor.tsx": 647,
     "src/app/(dashboard)/network/NetworkOrbitWithGenesis.tsx": 374,
     "src/app/(dashboard)/settings/aion/MemoryBackfillSection.tsx": 325,

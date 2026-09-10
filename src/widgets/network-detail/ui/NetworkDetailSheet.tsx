@@ -34,6 +34,7 @@ import { NodeCrewList } from './NodeCrewList';
 import type { NodeDetail, NodeDetailCrewMember } from '@/features/network-data';
 import { STAGE_LIGHT, STAGE_NAV_CROSSFADE } from '@/shared/lib/motion-constants';
 import { PromotedMetricsRow } from './PromotedMetricsRow';
+import { EntityStateChip } from './EntityStateChip';
 import { LinkedPeople } from '@/entities/network/ui/LinkedPeople';
 import { ContactStrip } from './network-detail-sheet/contact-strip';
 import { TransmissionPanel } from './network-detail-sheet/transmission-panel';
@@ -183,6 +184,18 @@ export function NetworkDetailSheet({ nodeId, kind, details: detailsProp, onClose
               sourceOrgId={sourceOrgId}
               onSummonSuccess={handleRefresh}
             />
+
+            {/* The triage byte, before anything else on the record: the one
+                fact that could change what you were about to do. */}
+            {workspaceId && details.subjectEntityId && (
+              <div className="px-6 pb-2">
+                <EntityStateChip
+                  workspaceId={workspaceId}
+                  entityId={details.subjectEntityId}
+                  doNotRebook={details.doNotRebook}
+                />
+              </div>
+            )}
 
             {/* Who else is on this record, directly under the name. The graph
                 has carried this since the show was created and nothing has ever

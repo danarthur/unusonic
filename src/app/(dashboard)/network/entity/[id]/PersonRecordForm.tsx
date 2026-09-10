@@ -267,6 +267,7 @@ export function PersonRecordForm({
       avatarType="person"
       returnPath={returnPath}
       sourceOrgId={sourceOrgId}
+      doNotRebook={details.doNotRebook}
       dirty={hasChanges}
       saving={isPending}
       onSave={handleSave}
