@@ -1514,7 +1514,7 @@ export type Database = {
           p_source?: string
           p_workspace_id: string
         }
-        Returns: boolean
+        Returns: Json
       }
     }
     Enums: {
@@ -8114,6 +8114,7 @@ export type Database = {
           rank: number
         }[]
       }
+      anon_executable_secdef_allowlist: { Args: never; Returns: string[] }
       bulk_approve_pending_equipment: {
         Args: { p_workspace_id: string }
         Returns: number
