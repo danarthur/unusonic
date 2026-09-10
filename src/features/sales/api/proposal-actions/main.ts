@@ -13,7 +13,8 @@ import type { Package } from '@/types/supabase';
 import type { ProposalWithItems } from '../../model/types';
 import { resolveRequiredRoles, type RequiredRole, type PackageDefinition } from '../package-types';
 import { upsertEmbedding, observeUpsert, buildContextHeader } from '@/app/api/aion/lib/embeddings';
-import type { TablesUpdate } from '@/types/supabase';
+import type { TablesInsert, TablesUpdate } from '@/types/supabase';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 /** Base URL for public links (proposal, claim, etc.). Prefer NEXT_PUBLIC_APP_URL; on Vercel fall back to VERCEL_URL so links in emails are always absolute. */
 function getPublicBaseUrl(): string {
@@ -262,13 +263,13 @@ async function resolveWorkspaceIdFromDeal(
 
 /** Build a definition_snapshot JSONB object from line item data. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts line items from several call sites whose row shapes differ; only known keys are read.
-function buildSnapshot(item: any): Record<string, unknown> | null {
-  const snap: Record<string, unknown> = {};
+function buildSnapshot(item: any): JsonObject | null {
+  const snap: JsonObject = {};
   if (item.category) snap.margin_meta = { category: item.category };
   if (item.requiredRoles?.length) snap.crew_meta = { required_roles: item.requiredRoles };
   if (item.floorPrice != null) snap.price_meta = { floor_price: item.floorPrice };
   if (item.isTaxable != null) snap.tax_meta = { is_taxable: item.isTaxable };
-  const scheduleMeta: Record<string, unknown> = {};
+  const scheduleMeta: JsonObject = {};
   if (item.timeStart) scheduleMeta.time_start = item.timeStart;
   if (item.timeEnd) scheduleMeta.time_end = item.timeEnd;
   if (item.performanceSetCount != null) scheduleMeta.performance_set_count = item.performanceSetCount;
@@ -554,7 +555,7 @@ export async function addPackageToProposal(
   const nextSortOrder = placement.nextSortOrder;
   // Single-item packages: skip the header+child structure — just add a flat line item at bundle price.
   // Multi-item packages: insert a bundle header row then children at $0 (Tagged Bursting pattern).
-  let rowsToInsert: object[];
+  let rowsToInsert: TablesInsert<'proposal_items'>[];
   if (expanded.length === 1) {
     const item = expanded[0];
     rowsToInsert = [{
@@ -965,7 +966,9 @@ export async function upsertProposal(
       name: item.name,
       description: item.description ?? null,
       quantity: item.quantity,
-      unit_price: String(item.unitPrice),
+      // Numeric column. Every other insert path here passes a number; this one
+      // stringified, which Postgres accepted and the type does not.
+      unit_price: Number(item.unitPrice),
       override_price: item.overridePrice != null && Number.isFinite(Number(item.overridePrice)) ? Number(item.overridePrice) : null,
       actual_cost: item.actualCost != null && Number.isFinite(Number(item.actualCost)) ? Number(item.actualCost) : null,
       internal_notes: item.internalNotes ?? null,

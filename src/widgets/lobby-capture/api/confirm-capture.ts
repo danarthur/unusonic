@@ -31,6 +31,7 @@ import { syncCaptureToMemory } from '@/app/api/aion/lib/capture-memory-sync';
 import type { CaptureParseResult } from '@/app/api/aion/capture/parse/route';
 import { readEntityAttrs } from '@/shared/lib/entity-attrs';
 import { decideVenueFact, normaliseFact } from './venue-facts';
+import type { JsonObject } from '@/shared/lib/jsonb';
 
 export type CaptureVisibility = 'user' | 'workspace';
 
@@ -257,7 +258,7 @@ async function createGhostFromParse(
   const trimmed = name.trim();
   if (!trimmed) return { error: 'Name is required.' };
 
-  const attributes: Record<string, unknown> = {
+  const attributes: JsonObject = {
     is_ghost: true,
     from_capture: true,
   };

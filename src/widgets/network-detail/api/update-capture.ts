@@ -175,9 +175,17 @@ export async function updateCapture(
       // Also revalidate the OLD entity page so its timeline drops the row.
       const oldEntityId = capture.resolved_entity_id;
 
+      /*
+        NULL is a supported argument here -- `cortex.reassign_capture` branches
+        on `p_new_entity_id IS NOT NULL` and un-assigns the capture when it is
+        null. The generated signature cannot say so: the parameter has no
+        DEFAULT, so codegen types it as a required non-nullable uuid, and there
+        is no way to express "required, and nullable". Giving the parameter a
+        `DEFAULT NULL` would make the type optional and remove the cast.
+      */
       const { error } = await cortex.rpc('reassign_capture', {
         p_capture_id: input.captureId,
-        p_new_entity_id: input.newEntityId,
+        p_new_entity_id: input.newEntityId as unknown as string,
       });
       if (error) return { ok: false, error: error.message };
 
