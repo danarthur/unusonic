@@ -236,7 +236,7 @@ async function autoFillWorkingNotes(
   if (Object.keys(patch).length === 0) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: wrote, error: notesErr } = await supabase.schema('directory').rpc('upsert_entity_working_notes', {
+  const { data: wroteRaw, error: notesErr } = await supabase.schema('directory').rpc('upsert_entity_working_notes', {
     p_workspace_id: workspaceId,
     p_entity_id: entityId,
     p_communication_style: patch.p_communication_style ?? undefined,
@@ -253,11 +253,13 @@ async function autoFillWorkingNotes(
     from a write. That is the silent-write defect this branch exists to end,
     and it was sitting in the branch's own capture path.
   */
-  if (notesErr || wrote === false) {
+  const wrote = wroteRaw as { ok?: boolean; error?: string } | null;
+  if (notesErr || !wrote?.ok) {
+    // A named reason, so a refusal here is diagnosable from the log line alone.
     console.warn('[capture] working-notes auto-fill refused', {
       workspaceId,
       entityId,
-      reason: notesErr?.message ?? 'rpc returned false',
+      reason: notesErr?.message ?? wrote?.error ?? 'unknown',
     });
   }
 }

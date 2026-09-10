@@ -25,6 +25,7 @@ import type {
 } from './get-working-notes';
 import { PRIVATE_NOTES_MAX, privateNotesTooLong } from '../model/working-notes-limits';
 import { workingNotesRpcArgs } from '../model/working-notes-args';
+import { workingNotesErrorMessage } from '../model/working-notes-errors';
 
 export type UpdateWorkingNotesPatch = {
   communicationStyle?: string | null;
@@ -69,8 +70,12 @@ export async function updateWorkingNotes(
     });
 
   if (error) return { ok: false, error: (error as { message: string }).message };
-  if (data === false) {
-    return { ok: false, error: 'Write refused — workspace mismatch or invalid value.' };
+
+  // The RPC returns `{ ok, error }` -- a named reason rather than a bare false,
+  // so a refusal can be told from the six other refusals it used to look like.
+  const result = data as { ok?: boolean; error?: string } | null;
+  if (!result?.ok) {
+    return { ok: false, error: workingNotesErrorMessage(result?.error) };
   }
 
   revalidatePath(`/network/entity/${entityId}`);

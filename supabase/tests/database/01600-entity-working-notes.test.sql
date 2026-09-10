@@ -17,7 +17,7 @@
 --     clears it, so saving a note must not wipe the DNR flag beside it.
 
 BEGIN;
-SELECT plan(7);
+SELECT plan(11);
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -67,8 +67,8 @@ SELECT is(
   directory.upsert_entity_working_notes(
     p_workspace_id => '11111111-1111-1111-1111-111111111111',
     p_entity_id    => '55555555-5555-5555-5555-555555555555',
-    p_private_notes => 'Prefers a call before the invoice goes out.'),
-  true,
+    p_private_notes => 'Prefers a call before the invoice goes out.') ->> 'ok',
+  'true',
   'a workspace member can write a private note'
 );
 
@@ -86,9 +86,9 @@ SELECT is(
     p_workspace_id => '11111111-1111-1111-1111-111111111111',
     p_entity_id    => '55555555-5555-5555-5555-555555555555',
     p_private_notes => 'inferred by a machine',
-    p_source        => 'capture'),
-  false,
-  'a capture cannot write a private note'
+    p_source        => 'capture') ->> 'error',
+  'capture_cannot_write_private_note',
+  'a capture is refused by name, not by a bare false'
 );
 
 SELECT is(
@@ -121,9 +121,54 @@ SELECT is(
   directory.upsert_entity_working_notes(
     p_workspace_id => '11111111-1111-1111-1111-111111111111',
     p_entity_id    => '55555555-5555-5555-5555-555555555555',
-    p_private_notes => 'from another workspace'),
-  false,
-  'a non-member cannot write a private note on this workspace''s contact'
+    p_private_notes => 'from another workspace') ->> 'error',
+  'not_a_member',
+  'a non-member is refused by name'
+);
+
+/*
+  5. Every refusal is distinguishable.
+
+  The point of the jsonb return: this used to be one boolean meaning seven
+  different things, and the caller said "workspace mismatch or invalid value"
+  for all of them. A write that fails for a reason nobody can name is the
+  undiagnosable-write problem the schema audit existed to end.
+*/
+SELECT test_authenticate_as('33333333-3333-3333-3333-333333333333');
+
+SELECT is(
+  directory.upsert_entity_working_notes(
+    p_workspace_id => '11111111-1111-1111-1111-111111111111',
+    p_entity_id    => '99999999-9999-9999-9999-999999999999') ->> 'error',
+  'entity_not_in_workspace',
+  'an entity in another workspace is named as such'
+);
+
+SELECT is(
+  directory.upsert_entity_working_notes(
+    p_workspace_id => '11111111-1111-1111-1111-111111111111',
+    p_entity_id    => '55555555-5555-5555-5555-555555555555',
+    p_dnr_reason   => 'vibes') ->> 'error',
+  'invalid_dnr_reason',
+  'an unknown do-not-rebook reason is named as such'
+);
+
+SELECT is(
+  directory.upsert_entity_working_notes(
+    p_workspace_id => '11111111-1111-1111-1111-111111111111',
+    p_entity_id    => '55555555-5555-5555-5555-555555555555',
+    p_preferred_channel => 'telepathy') ->> 'error',
+  'invalid_preferred_channel',
+  'an unknown preferred channel is named as such'
+);
+
+SELECT is(
+  directory.upsert_entity_working_notes(
+    p_workspace_id => '11111111-1111-1111-1111-111111111111',
+    p_entity_id    => '55555555-5555-5555-5555-555555555555',
+    p_source       => 'robot') ->> 'error',
+  'invalid_source',
+  'an unknown source is named as such'
 );
 
 SELECT * FROM finish();
