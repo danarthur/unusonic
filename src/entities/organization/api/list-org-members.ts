@@ -51,21 +51,24 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRosterItem
     .in('id', sourceEntityIds);
   const dirEntById = new Map((dirEnts ?? []).map((e) => [e.id, e]));
 
-  // 5. Best-effort skills via legacy org_member_id references in context_data
-  const legacyMemberIds = activeRels
-    .map((r) => (r.context_data as Record<string, unknown>)?.org_member_id as string | undefined)
-    .filter((id): id is string => Boolean(id));
-  const skillsByLegacyId = new Map<string, string[]>();
-  if (legacyMemberIds.length > 0) {
-    const { data: skillRows } = await supabase
-      .from('talent_skills')
-      .select('org_member_id, skill_tag')
-      .in('org_member_id', legacyMemberIds);
-    for (const row of skillRows ?? []) {
-      const existing = skillsByLegacyId.get(row.org_member_id) ?? [];
-      existing.push(row.skill_tag);
-      skillsByLegacyId.set(row.org_member_id, existing);
-    }
+  /*
+    5. Skills, from ops.crew_skills by entity id.
+
+    This went to `public.talent_skills` through a legacy `org_member_id` kept in
+    the edge's context_data. That table does not exist, so the roster came back
+    with no skills at all. crew_skills hangs off the person entity and is scoped
+    to the caller's workspaces by RLS.
+  */
+  const skillsByEntityId = new Map<string, string[]>();
+  const { data: skillRows } = await supabase
+    .schema('ops')
+    .from('crew_skills')
+    .select('entity_id, skill_tag')
+    .in('entity_id', sourceEntityIds);
+  for (const row of skillRows ?? []) {
+    const existing = skillsByEntityId.get(row.entity_id) ?? [];
+    existing.push(row.skill_tag);
+    skillsByEntityId.set(row.entity_id, existing);
   }
 
   // 6. Map each relationship to OrgMemberRosterItem
@@ -92,8 +95,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRosterItem
       dirEnt.display_name ||
       (attrs.email as string | undefined) ||
       '';
-    const legacyMemberId = ctx.org_member_id as string | undefined;
-    const skill_tags = legacyMemberId ? (skillsByLegacyId.get(legacyMemberId) ?? []) : [];
+    const skill_tags = skillsByEntityId.get(rel.source_entity_id) ?? [];
     const portal_profile = (ctx.primary_portal_profile as string | undefined) ?? null;
 
     items.push({

@@ -463,26 +463,14 @@ export async function finishPartnerClaim(
         p_context_data: { tier: 'standard', lifecycle_status: 'active', notes: existingCtx.notes ?? null },
       });
 
-      // Migrate private data (keyed by legacy_org_id for backward compat)
-      const plannerLegacyId = plannerEnt.legacy_org_id ?? plannerEnt.id;
-      const ghostLegacyId = ghost.legacy_org_id ?? ghost.id;
-      const sovereignLegacyId = ghostLegacyId; // preserve subject key for now
-
-      const { data: privateRow } = await supabase
-        .from('org_private_data')
-        .select('private_notes, internal_rating')
-        .eq('owner_org_id', plannerLegacyId)
-        .eq('subject_org_id', ghostLegacyId)
-        .maybeSingle();
-
-      if (privateRow) {
-        await supabase.from('org_private_data').upsert({
-          owner_org_id: plannerLegacyId,
-          subject_org_id: sovereignLegacyId,
-          private_notes: privateRow.private_notes,
-          internal_rating: privateRow.internal_rating,
-        }, { onConflict: 'subject_org_id,owner_org_id' });
-      }
+      /*
+        Private data used to be carried across here, from `org_private_data`
+        keyed by legacy org id. That table does not exist, so the read returned
+        nothing and the copy never ran -- and the destination key was the same
+        as the source key anyway, making it a no-op by construction. When
+        private notes come back on `directory.entity_working_notes`, the claim
+        flow will need to carry them; nothing to carry until then.
+      */
     }
   }
 
