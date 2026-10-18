@@ -25,4 +25,4 @@ This is the queue the research agent reads. When you have a thought, idea, or qu
 
 ## Done
 
-- [x] 2026-10-18 Seed question — Scope Phase A of the Aion agent architecture. Specifically: given the Brain tab is currently paused and `public.workspaces.aion_config` doesn't exist, what's the minimum path to unblock voice setup + first real draft? — see PR
+- [x] 2026-10-18 Seed question — Scope Phase A of the Aion agent architecture. Specifically: given the Brain tab is currently paused and `public.workspaces.aion_config` doesn't exist, what's the minimum path to unblock voice setup + first real draft? — see PR #195
